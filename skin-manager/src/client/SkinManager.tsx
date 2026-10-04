@@ -9,6 +9,7 @@ import type {
 } from '../protocol.ts'
 import { SkinCustomizationRegistry, settingVisible } from './runtime.ts'
 import { definitionTitle, optionLabel, settingDescription, settingLabel, skinManagerCopy, useUiLang } from './locale.ts'
+import { activeSkins, isDesktopShell, waitForSkins } from './switch-settle.ts'
 import {
   buildPreferencesExport,
   defaultExportFileName,
@@ -634,7 +635,10 @@ export function SkinManager({ registry, active, switchSkin }: SkinManagerInjecte
     if (acceptRisk && !window.confirm(copy.incompatibleConfirm(blocked.runtimeVersion))) return
     setSwitching(target)
     setError(null)
-    void switchSkin(target, acceptRisk).catch((reason) => {
+    void switchSkin(target, acceptRisk).then(() => {
+      // Only a switch settled without reload returns; re-render the new state.
+      if (live.current) setSwitching(null)
+    }, (reason) => {
       setSwitching(null)
       setError(reason instanceof Error ? reason.message : String(reason))
     })
@@ -1039,15 +1043,36 @@ export async function fetchSkinVersions(): Promise<Map<string, SkinVersionInfo>>
   return new Map(result.versions.map(version => [version.id, version]))
 }
 
-/** Same-origin host switch with a bounded refresh handoff. */
+/**
+ * Same-origin host switch. The page reloads once DSH starts applying the patch
+ * rather than after a fixed delay, and the desktop shell keeps the in-place
+ * switch (see switch-settle.ts).
+ */
 export async function requestSkinSwitch(target: SkinTarget, acceptRisk = false): Promise<void> {
-  const response = await fetch(SKIN_MANAGER_ROUTE, {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(acceptRisk ? { target, acceptRisk: true } : { target }),
-  })
-  const result = await response.json() as { ok?: boolean, error?: string }
-  if (!response.ok || result.ok !== true) throw new Error(result.error ?? `HTTP ${response.status}`)
-  window.setTimeout(() => window.location.reload(), 1200)
+  const catalog = await fetchSkinCatalog()
+  const desktop = isDesktopShell()
+  const before = activeSkins(catalog, document.body).join(',')
+  const isTarget = (active: string[]): boolean => target === 'official'
+    ? active.length === 0
+    : active.length === 1 && active[0] === target
+  const cancel = new AbortController()
+  // Web reloads at the first change (old skin removed or new one added); the
+  // desktop shell waits until the requested skin is mounted in place.
+  const settled = waitForSkins(catalog, desktop ? isTarget : active => active.join(',') !== before, document, undefined, cancel.signal)
+  try {
+    const response = await fetch(SKIN_MANAGER_ROUTE, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(acceptRisk ? { target, acceptRisk: true } : { target }),
+    })
+    const result = await response.json() as { ok?: boolean, error?: string }
+    if (!response.ok || result.ok !== true) throw new Error(result.error ?? `HTTP ${response.status}`)
+  } catch (error) {
+    cancel.abort()
+    throw error
+  }
+  // A switch that never starts applying still falls back to a reload.
+  if (await settled && desktop) return
+  window.location.reload()
 }
