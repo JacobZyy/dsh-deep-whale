@@ -698,6 +698,28 @@ describe('Maid Atelier skin apply', () => {
     expect(document.body.hasAttribute('data-maid-shell')).toBe(false)
   })
 
+  it('keeps the new-session icon inside the 0.2.0-rc.2 label mask on the phone top bar', () => {
+    // rc.2 seats the collapsed button's icon in `newSessionLabelMask`; hiding
+    // every `newSessionLabel*` substring emptied the round top-bar target.
+    document.body.setAttribute('data-dsh-maid-atelier', '')
+    document.documentElement.setAttribute('data-maid-nav-mode', 'topbar')
+    document.body.innerHTML = `
+      <div data-sidebar-collapsed><div class="fixture_sidebarCol">
+        <button class="fixture_newSession"><span class="fixture_newSessionLabelMask"><span class="fixture_newSessionContent"><svg></svg></span></span></button>
+      </div></div>
+    `
+    const mask = document.querySelector('.fixture_newSessionLabelMask')!
+    const hidden = flatCssRules(CSS).filter((rule) => /display:\s*none/.test(rule.body)).filter((rule) => {
+      try {
+        return mask.matches(rule.selector)
+      } catch {
+        return false
+      }
+    })
+    expect(hidden.map((rule) => rule.selector)).toEqual([])
+    document.documentElement.removeAttribute('data-maid-nav-mode')
+  })
+
   it('keeps the phone frame reflow off a plugin root layout', () => {
     // The portrait-phone rules turn the official frame into a flex column. A
     // replacement root shell is also the root slot's first child; reflowing it
