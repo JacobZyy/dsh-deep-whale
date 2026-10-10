@@ -99,6 +99,42 @@ body[data-dsh-maid-atelier][data-ds-dark-theme] {
   --dsw-specific-sidebar-fill: rgba(5, 13, 40, 0.9);
 }
 
+/* Fallback, not an adaptation: the client marks the page when a plugin has
+   replaced the official root layout. The palace stage and sidebar art never
+   mount there, so the translucent surfaces above would show the plain page or
+   the conversation straight through a drawer. Keep the palette, drop the
+   transparency, and leave that layout's own structure alone. */
+body[data-dsh-maid-atelier][data-maid-shell='foreign'] {
+  --dsw-alias-bg-base: #e7edf8;
+  --dsw-alias-bg-layer-1: #f5f7fc;
+  --dsw-alias-bg-layer-2: #ebf0fa;
+  --dsw-alias-bg-layer-3: #e0e7f6;
+  --dsw-specific-sidebar-fill: #0b1942;
+}
+
+body[data-dsh-maid-atelier][data-ds-dark-theme][data-maid-shell='foreign'] {
+  --dsw-alias-bg-base: #0a132f;
+  --dsw-alias-bg-layer-1: #121f43;
+  --dsw-alias-bg-layer-2: #182850;
+  --dsw-alias-bg-layer-3: #20315b;
+  --dsw-specific-sidebar-fill: #050d28;
+}
+
+/* The expanded sidebar paints the navy sidebar fill, so it keeps its light ink
+   through the slot rather than the official column class, which that layout
+   does not render. The collapsed rail paints no fill and keeps the page ink. */
+body[data-dsh-maid-atelier][data-maid-shell='foreign']
+  [data-slot='sidebar'] > [class*='root']:not([class*='collapsed']) {
+  --dsw-alias-label-primary: #f8f3e8;
+  --dsw-alias-label-secondary: #d7def0;
+  --dsw-alias-label-tertiary: #b5c1dd;
+  --dsw-alias-label-caption: #96a8ce;
+  --dsw-alias-border-l1: rgba(225, 207, 170, 0.2);
+  --dsw-alias-border-l2: rgba(225, 207, 170, 0.32);
+  --dsw-alias-interactive-bg-hover: rgba(255, 252, 243, 0.1);
+  --dsw-alias-interactive-bg-active: rgba(197, 164, 104, 0.3);
+}
+
 body[data-dsh-maid-atelier] [id='root'] {
   position: relative;
   background: transparent;
@@ -562,6 +598,13 @@ body[data-dsh-maid-atelier] [data-slot='conversation.header'] > header {
   z-index: 21;
   color: #f8f3e8;
   text-shadow: 0 1px 3px rgba(4, 11, 35, 0.55);
+}
+
+/* Those light, glowing labels are drawn for the navy top band that only the
+   official conversation column paints. Under a plugin-replaced root layout the
+   header carries that band itself. */
+body[data-dsh-maid-atelier][data-maid-shell='foreign'] [data-slot='conversation.header'] > header {
+  background-color: var(--dsw-alias-bg-base);
 }
 
 body[data-dsh-maid-atelier] [data-slot='conversation.header'] > header
@@ -2020,7 +2063,7 @@ body[data-dsh-maid-atelier][data-maid-sidebar-size='rail']
   html:not([data-maid-nav-mode='rail']) body[data-dsh-maid-atelier]
     div[data-sidebar-collapsed],
   html:not([data-maid-nav-mode='rail']) body[data-dsh-maid-atelier]
-    [id='root'] > div[data-slot='root'] > div:not([data-sidebar-collapsed]) {
+    [id='root'] > div[data-slot='root'] > div[class*='frame']:not([data-sidebar-collapsed]) {
     display: flex !important;
     flex-direction: column !important;
     grid-template-columns: none !important;
@@ -2033,7 +2076,7 @@ body[data-dsh-maid-atelier][data-maid-sidebar-size='rail']
     div[data-sidebar-collapsed]
     > [class*='centerCol'],
   html:not([data-maid-nav-mode='rail']) body[data-dsh-maid-atelier]
-    [id='root'] > div[data-slot='root'] > div:not([data-sidebar-collapsed])
+    [id='root'] > div[data-slot='root'] > div[class*='frame']:not([data-sidebar-collapsed])
     > [class*='centerCol'] {
     flex: 1 1 auto !important;
     width: 100% !important;
@@ -2045,7 +2088,7 @@ body[data-dsh-maid-atelier][data-maid-sidebar-size='rail']
      While it is open the frame drops that track, the conversation keeps the
      full width, and the drawer floats (shared rule below). */
   html[data-maid-nav-mode='rail'] body[data-dsh-maid-atelier]
-    [id='root'] > div[data-slot='root'] > div:not([data-sidebar-collapsed]) {
+    [id='root'] > div[data-slot='root'] > div[class*='frame']:not([data-sidebar-collapsed]) {
     display: flex !important;
     flex-direction: column !important;
     grid-template-columns: none !important;
@@ -2055,7 +2098,7 @@ body[data-dsh-maid-atelier][data-maid-sidebar-size='rail']
   }
 
   html[data-maid-nav-mode='rail'] body[data-dsh-maid-atelier]
-    [id='root'] > div[data-slot='root'] > div:not([data-sidebar-collapsed])
+    [id='root'] > div[data-slot='root'] > div[class*='frame']:not([data-sidebar-collapsed])
     > [class*='centerCol'] {
     flex: 1 1 auto !important;
     width: 100% !important;
@@ -2077,7 +2120,7 @@ body[data-dsh-maid-atelier][data-maid-sidebar-size='rail']
      once it ends the column computes to no transform at all, so the panel is
      positioned right without disabling anything. */
   html:not([data-maid-nav-mode='rail']) body[data-dsh-maid-atelier]
-    [id='root'] > div[data-slot='root'] > div:not([data-sidebar-collapsed])
+    [id='root'] > div[data-slot='root'] > div[class*='frame']:not([data-sidebar-collapsed])
     [class*='sidebarCol'] {
     animation: maidAtelierPhoneDrawerIn 220ms cubic-bezier(0.22, 0.78, 0.2, 1) backwards;
   }
@@ -2094,7 +2137,7 @@ body[data-dsh-maid-atelier][data-maid-sidebar-size='rail']
   }
 
   html[data-maid-nav-mode='rail'] body[data-dsh-maid-atelier]
-    [id='root'] > div[data-slot='root'] > div:not([data-sidebar-collapsed])
+    [id='root'] > div[data-slot='root'] > div[class*='frame']:not([data-sidebar-collapsed])
     [class*='sidebarCol'] {
     animation: maidAtelierPhoneDrawerIn 220ms cubic-bezier(0.22, 0.78, 0.2, 1) backwards;
   }
@@ -2459,7 +2502,7 @@ body[data-dsh-maid-atelier][data-maid-sidebar-size='rail']
      keeps the full width and never moves. `rail` shares this rule so its own
      collapsed rail stays the host's, while opening it stops pushing the chat. */
   body[data-dsh-maid-atelier]
-    [id='root'] > div[data-slot='root'] > div:not([data-sidebar-collapsed])
+    [id='root'] > div[data-slot='root'] > div[class*='frame']:not([data-sidebar-collapsed])
     [class*='sidebarCol'] {
     position: fixed !important;
     top: 0 !important;
@@ -6627,7 +6670,7 @@ body[data-dsh-maid-atelier][data-ds-dark-theme] [data-phase='active'] :has(+ * >
 
 @media (prefers-reduced-motion: reduce) {
   body[data-dsh-maid-atelier]
-    [id='root'] > div[data-slot='root'] > div:not([data-sidebar-collapsed])
+    [id='root'] > div[data-slot='root'] > div[class*='frame']:not([data-sidebar-collapsed])
     [class*='sidebarCol'] {
     animation: none;
   }

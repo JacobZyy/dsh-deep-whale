@@ -666,6 +666,60 @@ describe('Maid Atelier skin apply', () => {
     expect(bottomTrim?.parentElement?.className).toBe('fixture_centerCol')
   })
 
+  it('marks a plugin-replaced root layout as foreign and retracts the mark', async () => {
+    // dsh-mobile registers its own `root` slot: the official frame and its
+    // conversation column never render, so the stage cannot mount (#190).
+    document.body.innerHTML = '<div id="root"><div data-slot="root"><div class="plugin_shell"><main></main></div></div></div>'
+    fiber = await mount()
+    expect(document.body.getAttribute('data-maid-shell')).toBe('foreign')
+    expect(document.querySelector("[data-skin-chrome='character-stage']")).toBeNull()
+
+    // A hot swap back to the official layout drops the fallback.
+    const slot = document.querySelector("[data-slot='root']")!
+    slot.innerHTML = '<div class="fixture_frame"><div class="fixture_sidebarCol"></div><div class="fixture_centerCol"></div></div>'
+    await flushMutations()
+    expect(document.body.hasAttribute('data-maid-shell')).toBe(false)
+
+    slot.innerHTML = '<div class="plugin_shell"></div>'
+    await flushMutations()
+    expect(document.body.getAttribute('data-maid-shell')).toBe('foreign')
+
+    await fiber.dispose()
+    fiber = undefined
+    expect(document.body.hasAttribute('data-maid-shell')).toBe(false)
+  })
+
+  it('leaves the official frame and a not-yet-mounted root unmarked', async () => {
+    fiber = await mount()
+    expect(document.body.hasAttribute('data-maid-shell')).toBe(false)
+
+    document.body.insertAdjacentHTML('beforeend', '<div id="root"><div data-slot="root"><div class="fixture_frame"><div class="fixture_centerCol"></div></div></div></div>')
+    await flushMutations()
+    expect(document.body.hasAttribute('data-maid-shell')).toBe(false)
+  })
+
+  it('keeps the phone frame reflow off a plugin root layout', () => {
+    // The portrait-phone rules turn the official frame into a flex column. A
+    // replacement root shell is also the root slot's first child; reflowing it
+    // collapsed dsh-mobile's main pane and blanked the Trajectory view (#190).
+    document.body.setAttribute('data-dsh-maid-atelier', '')
+    document.body.innerHTML = `
+      <div id="root"><div data-slot="root"><div class="plugin_shell"></div></div></div>
+      <div id="root"><div data-slot="root"><div class="fixture_frame"></div></div></div>
+    `
+    const shell = document.querySelector('.plugin_shell')!
+    const frame = document.querySelector('.fixture_frame')!
+    const reflows = flatCssRules(CSS)
+      .filter((rule) => rule.selector.includes("[data-slot='root']") && /display:\s*flex/.test(rule.body))
+    expect(reflows.length, 'root-slot frame reflow rules').toBeGreaterThan(0)
+    for (const mode of ['corner', 'topbar', 'rail']) {
+      document.documentElement.setAttribute('data-maid-nav-mode', mode)
+      for (const rule of reflows) expect(shell.matches(rule.selector), rule.selector).toBe(false)
+      expect(reflows.some((rule) => frame.matches(rule.selector)), `${mode}: official frame still reflows`).toBe(true)
+    }
+    document.documentElement.removeAttribute('data-maid-nav-mode')
+  })
+
   it('keeps each overlapping activation in ownership of its own character stage', async () => {
     const originalBodyStyle = document.body.getAttribute('style')
     document.body.innerHTML = '<div class="fixture_centerCol"></div>'

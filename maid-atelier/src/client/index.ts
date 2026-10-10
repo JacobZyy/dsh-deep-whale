@@ -286,6 +286,17 @@ function ensureChatAreaStage(stage: HTMLElement): boolean {
   return true
 }
 
+/**
+ * The skin is composed for the official root layout, whose frame holds the
+ * conversation column as a direct child. A plugin may register its own `root`
+ * slot instead; the skin does not adapt to that layout, it only stops relying
+ * on the stage and translucent surfaces that need the official frame.
+ */
+function hasForeignRootLayout(): boolean {
+  const frame = document.querySelector("[id='root'] > [data-slot='root'] > :first-child")
+  return frame !== null && frame.querySelector(`:scope > ${CONVERSATION_COLUMN_SELECTOR}`) === null
+}
+
 function ensureChatAreaChrome(...chrome: HTMLElement[]): boolean {
   const chat = document.querySelector<HTMLElement>(CONVERSATION_COLUMN_SELECTOR)
   if (!chat) return false
@@ -512,6 +523,7 @@ export function apply(ctx: Context): void {
   const originalTitle = document.title
   const layoutResizeLease = createBodyAttributeLease(body, 'data-maid-layout-resizing')
   const lowPowerLease = createBodyAttributeLease(body, 'data-maid-low-power')
+  const foreignShellLease = createBodyAttributeLease(body, 'data-maid-shell', 'foreign')
   const previous = new Map<string, string>()
   for (const property of BACKDROP_PROPERTIES) {
     previous.set(property, body.style.getPropertyValue(property))
@@ -564,6 +576,7 @@ export function apply(ctx: Context): void {
     if (handleViewportResize !== undefined) window.removeEventListener('resize', handleViewportResize)
     layoutResizeLease.release()
     lowPowerLease.release()
+    foreignShellLease.release()
     if (railSearchFocusFrame !== undefined) cancelAnimationFrame(railSearchFocusFrame)
     if (recoverRailSearchFocus !== undefined) {
       document.removeEventListener('click', recoverRailSearchFocus)
@@ -964,9 +977,15 @@ export function apply(ctx: Context): void {
   bottomTrim.setAttribute('aria-hidden', 'true')
   ownedNodes.add(bottomTrim)
 
+  const syncShellKind = (): void => {
+    if (hasForeignRootLayout()) foreignShellLease.acquire()
+    else foreignShellLease.release()
+  }
+
   decorateTitlebarBrand(ownedNodes)
   decorateSidebar(ownedNodes, decoratedElements)
   decorateWorkspaceTree(decoratedElements)
+  syncShellKind()
   ensureChatAreaStage(characterStage)
   ensureChatAreaChrome(topTrim, bottomTrim)
   ensureComposerLaceRail(composerLaceRail)
@@ -1019,6 +1038,7 @@ export function apply(ctx: Context): void {
     let chatStructureChanged = false
     let settingsStateChanged = false
     let projectedStateChanged = false
+    let rootLayoutChanged = false
     for (const record of records) {
       const target = record.target instanceof Element ? record.target : undefined
       if (target?.closest(TERMINAL_SELECTOR) !== null) continue
@@ -1050,6 +1070,11 @@ export function apply(ctx: Context): void {
       }
       const appNodes = [...record.addedNodes, ...record.removedNodes]
         .filter(node => node instanceof Element && !isSkinChrome(node))
+      // Only the root slot's own children decide which layout owns the page.
+      if (!rootLayoutChanged && appNodes.length > 0
+        && (target?.id === 'root' || target?.parentElement?.id === 'root')) {
+        rootLayoutChanged = true
+      }
       if (!sidebarStructureChanged && appNodes.length > 0
         && ((target !== undefined && target.closest(SIDEBAR_COLUMN_SELECTOR) !== null)
           || appNodes.some(node => nodeTouches(node, sidebarChromeSelector)))) {
@@ -1080,6 +1105,7 @@ export function apply(ctx: Context): void {
         projectedStateChanged = true
       }
     }
+    if (rootLayoutChanged) syncShellKind()
     if (projectedStateChanged || settingsStateChanged) syncProjectedState()
     if (!sidebarStructureChanged && settingsStateChanged) syncSidebarCarriers()
     if (sidebarStructureChanged) syncSidebarDecorations()
