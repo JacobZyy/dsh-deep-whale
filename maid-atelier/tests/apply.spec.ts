@@ -742,6 +742,40 @@ describe('Maid Atelier skin apply', () => {
     document.documentElement.removeAttribute('data-maid-nav-mode')
   })
 
+  it('keeps the host collapsed rail and an opaque menu under a plugin root layout', () => {
+    // dsh-mobile keeps the host's narrow collapsed rail. The brand plate grew
+    // its logo row over the header tabs and the ribbon New Session was cut off
+    // by the rail; menus dropped grey over the header's navy band (#190).
+    document.body.setAttribute('data-dsh-maid-atelier', '')
+    document.body.innerHTML = `
+      <div data-slot="sidebar"><div class="fixture_root fixture_collapsed">
+        <div class="fixture_logoRow"><button class="fixture_toggle"></button></div>
+        <button class="fixture_newSession"></button>
+      </div></div>
+    `
+    const logoRow = document.querySelector('.fixture_logoRow')!
+    const newSession = document.querySelector('.fixture_newSession')!
+    const bodiesFor = (element: Element) => flatCssRules(CSS)
+      .filter((rule) => rule.selector.includes("[data-maid-shell='foreign']") && element.matches(rule.selector))
+      .map((rule) => rule.body)
+    expect(bodiesFor(logoRow)).toEqual([])
+    document.body.setAttribute('data-maid-shell', 'foreign')
+    expect(bodiesFor(logoRow).join('')).toMatch(/min-height: 0[^]*border: 0[^]*background: none/)
+    expect(bodiesFor(newSession).join('')).toMatch(/width: 38px[^]*border-image: none/)
+    const shellRule = CSS.match(/body\[data-dsh-maid-atelier\]\[data-maid-shell='foreign'\]\s*\{([^}]*)\}/)?.[1] ?? ''
+    expect(shellRule).toContain('--dsw-specific-menu: var(--dsw-alias-bg-layer-1)')
+    document.body.removeAttribute('data-maid-shell')
+  })
+
+  it('pairs the sidebar list fade with prefixed mask longhands', () => {
+    // Android WebView reads only `-webkit-mask-*` before 120.
+    const rule = CSS.match(/\[data-slot='sidebar\.workspaces'\]\s*\[class\*='treeBody'\] > \[class\*='list'\]\s*\{([^}]*)\}/)?.[1] ?? ''
+    for (const longhand of ['image', 'size', 'position', 'repeat']) {
+      expect(rule).toContain(`-webkit-mask-${longhand}:`)
+      expect(rule).toMatch(new RegExp(`(^|[^-])mask-${longhand}:`))
+    }
+  })
+
   it('keeps each overlapping activation in ownership of its own character stage', async () => {
     const originalBodyStyle = document.body.getAttribute('style')
     document.body.innerHTML = '<div class="fixture_centerCol"></div>'
@@ -1945,6 +1979,9 @@ describe('Maid Atelier skin apply', () => {
     expect(paneRule).toContain('pointer-events: none')
     expect(bodyRule).toContain('grid-row: 2')
     expect(bodyRule).not.toMatch(/filter|transform|contain/)
+    // The host writes the fade unprefixed, which WebView 105-119 ignores; the
+    // body must still paint above the pane there (#181).
+    expect(bodyRule).toContain('isolation: isolate')
     expect(CSS).toMatch(new RegExp(`\\[data-ds-dark-theme\\]\\s+${masked}::before\\s*\\{[^}]*rgba\\(10, 20, 48, 0\\.64\\)`))
     // The pane is the only glass layer: expanded members lie flat on it.
     const flatRule = CSS.match(
