@@ -5,9 +5,11 @@ import { SKIN_PACKAGE_ID } from './release-claimed-styles.ts'
 function platformOverlay(body: HTMLElement): HTMLElement | undefined {
   return Array.from(body.children).find((element): element is HTMLElement =>
     element instanceof HTMLElement
-    && element.matches("[role='dialog'][aria-modal='true'][class$='_overlay']")
+    && element.matches("[role='dialog'][aria-modal='true']")
+    && Array.from(element.classList).some(name => name.endsWith('_overlay'))
     && element.querySelector(':scope > header[data-window-drag]') !== null
-    && element.querySelector(":scope > [class$='_viewport']") !== null)
+    && Array.from(element.children).some(child =>
+      Array.from(child.classList).some(name => name.endsWith('_viewport'))))
 }
 
 /** Keep native Windows controls on the palette of the account page covering the main frame. */
