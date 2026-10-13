@@ -666,6 +666,116 @@ describe('Maid Atelier skin apply', () => {
     expect(bottomTrim?.parentElement?.className).toBe('fixture_centerCol')
   })
 
+  it('marks a plugin-replaced root layout as foreign and retracts the mark', async () => {
+    // dsh-mobile registers its own `root` slot: the official frame and its
+    // conversation column never render, so the stage cannot mount (#190).
+    document.body.innerHTML = '<div id="root"><div data-slot="root"><div class="plugin_shell"><main></main></div></div></div>'
+    fiber = await mount()
+    expect(document.body.getAttribute('data-maid-shell')).toBe('foreign')
+    expect(document.querySelector("[data-skin-chrome='character-stage']")).toBeNull()
+
+    // A hot swap back to the official layout drops the fallback.
+    const slot = document.querySelector("[data-slot='root']")!
+    slot.innerHTML = '<div class="fixture_frame"><div class="fixture_sidebarCol"></div><div class="fixture_centerCol"></div></div>'
+    await flushMutations()
+    expect(document.body.hasAttribute('data-maid-shell')).toBe(false)
+
+    slot.innerHTML = '<div class="plugin_shell"></div>'
+    await flushMutations()
+    expect(document.body.getAttribute('data-maid-shell')).toBe('foreign')
+
+    await fiber.dispose()
+    fiber = undefined
+    expect(document.body.hasAttribute('data-maid-shell')).toBe(false)
+  })
+
+  it('leaves the official frame and a not-yet-mounted root unmarked', async () => {
+    fiber = await mount()
+    expect(document.body.hasAttribute('data-maid-shell')).toBe(false)
+
+    document.body.insertAdjacentHTML('beforeend', '<div id="root"><div data-slot="root"><div class="fixture_frame"><div class="fixture_centerCol"></div></div></div></div>')
+    await flushMutations()
+    expect(document.body.hasAttribute('data-maid-shell')).toBe(false)
+  })
+
+  it('keeps the new-session icon inside the 0.2.0-rc.2 label mask on the phone top bar', () => {
+    // rc.2 seats the collapsed button's icon in `newSessionLabelMask`; hiding
+    // every `newSessionLabel*` substring emptied the round top-bar target.
+    document.body.setAttribute('data-dsh-maid-atelier', '')
+    document.documentElement.setAttribute('data-maid-nav-mode', 'topbar')
+    document.body.innerHTML = `
+      <div data-sidebar-collapsed><div class="fixture_sidebarCol">
+        <button class="fixture_newSession"><span class="fixture_newSessionLabelMask"><span class="fixture_newSessionContent"><svg></svg></span></span></button>
+      </div></div>
+    `
+    const mask = document.querySelector('.fixture_newSessionLabelMask')!
+    const hidden = flatCssRules(CSS).filter((rule) => /display:\s*none/.test(rule.body)).filter((rule) => {
+      try {
+        return mask.matches(rule.selector)
+      } catch {
+        return false
+      }
+    })
+    expect(hidden.map((rule) => rule.selector)).toEqual([])
+    document.documentElement.removeAttribute('data-maid-nav-mode')
+  })
+
+  it('keeps the phone frame reflow off a plugin root layout', () => {
+    // The portrait-phone rules turn the official frame into a flex column. A
+    // replacement root shell is also the root slot's first child; reflowing it
+    // collapsed dsh-mobile's main pane and blanked the Trajectory view (#190).
+    document.body.setAttribute('data-dsh-maid-atelier', '')
+    document.body.innerHTML = `
+      <div id="root"><div data-slot="root"><div class="plugin_shell"></div></div></div>
+      <div id="root"><div data-slot="root"><div class="fixture_frame"></div></div></div>
+    `
+    const shell = document.querySelector('.plugin_shell')!
+    const frame = document.querySelector('.fixture_frame')!
+    const reflows = flatCssRules(CSS)
+      .filter((rule) => rule.selector.includes("[data-slot='root']") && /display:\s*flex/.test(rule.body))
+    expect(reflows.length, 'root-slot frame reflow rules').toBeGreaterThan(0)
+    for (const mode of ['corner', 'topbar', 'rail']) {
+      document.documentElement.setAttribute('data-maid-nav-mode', mode)
+      for (const rule of reflows) expect(shell.matches(rule.selector), rule.selector).toBe(false)
+      expect(reflows.some((rule) => frame.matches(rule.selector)), `${mode}: official frame still reflows`).toBe(true)
+    }
+    document.documentElement.removeAttribute('data-maid-nav-mode')
+  })
+
+  it('keeps the host collapsed rail and an opaque menu under a plugin root layout', () => {
+    // dsh-mobile keeps the host's narrow collapsed rail. The brand plate grew
+    // its logo row over the header tabs and the ribbon New Session was cut off
+    // by the rail; menus dropped grey over the header's navy band (#190).
+    document.body.setAttribute('data-dsh-maid-atelier', '')
+    document.body.innerHTML = `
+      <div data-slot="sidebar"><div class="fixture_root fixture_collapsed">
+        <div class="fixture_logoRow"><button class="fixture_toggle"></button></div>
+        <button class="fixture_newSession"></button>
+      </div></div>
+    `
+    const logoRow = document.querySelector('.fixture_logoRow')!
+    const newSession = document.querySelector('.fixture_newSession')!
+    const bodiesFor = (element: Element) => flatCssRules(CSS)
+      .filter((rule) => rule.selector.includes("[data-maid-shell='foreign']") && element.matches(rule.selector))
+      .map((rule) => rule.body)
+    expect(bodiesFor(logoRow)).toEqual([])
+    document.body.setAttribute('data-maid-shell', 'foreign')
+    expect(bodiesFor(logoRow).join('')).toMatch(/min-height: 0[^]*border: 0[^]*background: none/)
+    expect(bodiesFor(newSession).join('')).toMatch(/width: 38px[^]*border-image: none/)
+    const shellRule = CSS.match(/body\[data-dsh-maid-atelier\]\[data-maid-shell='foreign'\]\s*\{([^}]*)\}/)?.[1] ?? ''
+    expect(shellRule).toContain('--dsw-specific-menu: var(--dsw-alias-bg-layer-1)')
+    document.body.removeAttribute('data-maid-shell')
+  })
+
+  it('pairs the sidebar list fade with prefixed mask longhands', () => {
+    // Android WebView reads only `-webkit-mask-*` before 120.
+    const rule = CSS.match(/\[data-slot='sidebar\.workspaces'\]\s*\[class\*='treeBody'\] > \[class\*='list'\]\s*\{([^}]*)\}/)?.[1] ?? ''
+    for (const longhand of ['image', 'size', 'position', 'repeat']) {
+      expect(rule).toContain(`-webkit-mask-${longhand}:`)
+      expect(rule).toMatch(new RegExp(`(^|[^-])mask-${longhand}:`))
+    }
+  })
+
   it('keeps each overlapping activation in ownership of its own character stage', async () => {
     const originalBodyStyle = document.body.getAttribute('style')
     document.body.innerHTML = '<div class="fixture_centerCol"></div>'
@@ -1869,6 +1979,9 @@ describe('Maid Atelier skin apply', () => {
     expect(paneRule).toContain('pointer-events: none')
     expect(bodyRule).toContain('grid-row: 2')
     expect(bodyRule).not.toMatch(/filter|transform|contain/)
+    // The host writes the fade unprefixed, which WebView 105-119 ignores; the
+    // body must still paint above the pane there (#181).
+    expect(bodyRule).toContain('isolation: isolate')
     expect(CSS).toMatch(new RegExp(`\\[data-ds-dark-theme\\]\\s+${masked}::before\\s*\\{[^}]*rgba\\(10, 20, 48, 0\\.64\\)`))
     // The pane is the only glass layer: expanded members lie flat on it.
     const flatRule = CSS.match(

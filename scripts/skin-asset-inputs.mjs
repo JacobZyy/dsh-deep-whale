@@ -8,7 +8,7 @@ export function hashSkinAssets(hash, skinRoot) {
   if (!existsSync(join(skinRoot, manifest))) return
   const text = readFileSync(join(skinRoot, manifest), 'utf8').replaceAll('\r\n', '\n')
   const files = JSON.parse(text)
-  if (!Array.isArray(files) || files.some(file => typeof file !== 'string' || !/^[a-f0-9]{64}\.(webp|png)$/.test(file))) {
+  if (!Array.isArray(files) || files.some(file => typeof file !== 'string' || !/^[a-f0-9]{64}\.(webp|png|ogg|wav|woff2)$/.test(file))) {
     throw new Error('Invalid skin artwork manifest')
   }
   hash.update(`${manifest}\0${Buffer.byteLength(text)}\0`).update(text)
