@@ -2370,6 +2370,67 @@ window.__ModuleLoader__.load({
 			};
 		}
 		//#endregion
+		//#region src/client/platform-caption.ts
+		/** Match the account feature's full-window portal without depending on localized labels. */
+		function platformOverlay(body) {
+			return Array.from(body.children).find((element) => element instanceof HTMLElement && element.matches("[role='dialog'][aria-modal='true']") && Array.from(element.classList).some((name) => name.endsWith("_overlay")) && element.querySelector(":scope > header[data-window-drag]") !== null && Array.from(element.children).some((child) => Array.from(child.classList).some((name) => name.endsWith("_viewport"))));
+		}
+		/** Keep native Windows controls on the palette of the account page covering the main frame. */
+		function installMaidPlatformCaption(ctx, body) {
+			if (!document.documentElement.hasAttribute("data-windows-titlebar")) return;
+			let sheet;
+			let observer;
+			const resample = () => {
+				document.head.dispatchEvent(new Event("load"));
+			};
+			const clear = () => {
+				if (sheet === void 0) return;
+				sheet.remove();
+				sheet = void 0;
+				resample();
+			};
+			ctx.effect(() => () => {
+				observer?.disconnect();
+				clear();
+			}, "ui-skin-maid-atelier: account page caption palette");
+			const sync = () => {
+				const overlay = platformOverlay(body);
+				if (overlay === void 0) {
+					clear();
+					return;
+				}
+				const palette = getComputedStyle(overlay);
+				const css = `
+html[data-windows-titlebar] body[data-dsh-maid-atelier]
+  > span[style*='--dsw-specific-sidebar-fill'][style*='--dsw-alias-label-primary'] {
+  --dsw-specific-sidebar-fill: ${palette.backgroundColor} !important;
+  --dsw-alias-label-primary: ${palette.getPropertyValue("--dsw-alias-label-primary")} !important;
+}
+html[data-windows-titlebar] body[data-dsh-maid-atelier] > [data-windows-menu] {
+  --dsw-alias-label-primary: ${palette.getPropertyValue("--dsw-alias-label-primary")} !important;
+  --dsw-alias-label-secondary: ${palette.getPropertyValue("--dsw-alias-label-secondary")} !important;
+  --dsw-alias-interactive-bg-hover: ${palette.getPropertyValue("--dsw-alias-interactive-bg-hover")} !important;
+}`;
+				if (sheet === void 0) {
+					sheet = document.createElement("style");
+					sheet.dataset.plugin = SKIN_PACKAGE_ID;
+					sheet.dataset.pluginCss = `${SKIN_PACKAGE_ID}/platform-caption`;
+					sheet.dataset.skinOwner = "maid-atelier";
+					sheet.textContent = css;
+					document.head.append(sheet);
+				} else if (sheet.textContent !== css) sheet.textContent = css;
+				else return;
+				resample();
+			};
+			observer = new MutationObserver(sync);
+			observer.observe(body, {
+				childList: true,
+				attributes: true,
+				attributeFilter: ["data-ds-dark-theme"]
+			});
+			sync();
+		}
+		//#endregion
 		//#region src/client/index.ts
 		const SKIN_TITLE = "深海女仆工坊 · DeepSeek Harness";
 		const SKIN_OWNER = "maid-atelier";
@@ -3140,6 +3201,7 @@ window.__ModuleLoader__.load({
 			});
 			syncSidebarCarriers();
 			installMaidPageIcons(ctx);
+			installMaidPlatformCaption(ctx, body);
 			document.title = SKIN_TITLE;
 		}
 		//#endregion

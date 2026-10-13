@@ -54,6 +54,7 @@ import { installMaidPageIcons } from './page-icons.ts'
 import { releaseClaimedStyles } from './release-claimed-styles.ts'
 import { installMaidRelationalMarkers } from './relational-markers.ts'
 import { installMaidCharacterFit } from './character-fit.ts'
+import { installMaidPlatformCaption } from './platform-caption.ts'
 
 const SKIN_TITLE = '深海女仆工坊 · DeepSeek Harness'
 const SKIN_OWNER = 'maid-atelier'
@@ -1140,6 +1141,7 @@ export function apply(ctx: Context): void {
 
   syncSidebarCarriers()
   installMaidPageIcons(ctx)
+  installMaidPlatformCaption(ctx, body)
 
   document.title = SKIN_TITLE
 }
