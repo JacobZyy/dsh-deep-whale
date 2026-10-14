@@ -96,7 +96,7 @@ const SIDEBAR_CARRIER_MARKS = {
   badge: 'data-maid-badge-carrier',
 } as const
 const SIDEBAR_CHROME_SELECTOR = "[data-skin-chrome='sidebar-mascot'], [data-skin-chrome='sidebar-corners'], [role='tooltip']"
-const MODAL_DIALOG_SELECTOR = "[role='dialog'][aria-modal='true']"
+const SIDEBAR_DIALOG_SELECTOR = "dialog, [role='dialog'], [role='alertdialog']"
 
 function markCarrier(element: Element, attribute: string, on: boolean): void {
   if (element.hasAttribute(attribute) !== on) element.toggleAttribute(attribute, on)
@@ -108,11 +108,11 @@ function syncSidebarCarriers(): void {
   if (sidebar !== null) {
     for (const child of sidebar.querySelectorAll(':scope > div > *')) {
       markCarrier(child, SIDEBAR_CARRIER_MARKS.tooltip, child.querySelector("[role='tooltip']") !== null)
-      markCarrier(child, SIDEBAR_CARRIER_MARKS.dialogRoot, child.querySelector(MODAL_DIALOG_SELECTOR) !== null)
+      markCarrier(child, SIDEBAR_CARRIER_MARKS.dialogRoot, child.querySelector(SIDEBAR_DIALOG_SELECTOR) !== null)
       markCarrier(child, SIDEBAR_CARRIER_MARKS.cordis, child.querySelector(CORDIS_PANEL_SELECTOR) !== null)
       if (child.matches(SIDEBAR_CHROME_SELECTOR)) continue
       for (const inner of child.children) {
-        markCarrier(inner, SIDEBAR_CARRIER_MARKS.dialog, inner.querySelector(MODAL_DIALOG_SELECTOR) !== null)
+        markCarrier(inner, SIDEBAR_CARRIER_MARKS.dialog, inner.querySelector(SIDEBAR_DIALOG_SELECTOR) !== null)
       }
     }
   }

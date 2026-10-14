@@ -9,13 +9,14 @@
 export const ORCA_CARRIER_MARKS = {
   tooltip: 'data-orca-tooltip-carrier',
   tooltipRoot: 'data-orca-tooltip-root',
+  dialogRoot: 'data-orca-dialog-root',
   dialog: 'data-orca-dialog-carrier',
   cordis: 'data-orca-cordis-carrier',
 } as const
 
 const SIDEBAR_ROOT_SELECTOR = "[data-slot='sidebar'] > :first-child"
 const TOOLTIP_SELECTOR = "[role='tooltip']"
-const DIALOG_SELECTOR = "[role='dialog']"
+const DIALOG_SELECTOR = "dialog, [role='dialog'], [role='alertdialog']"
 const CORDIS_PANEL_SELECTOR = '[data-cordis-panel]'
 
 function mark(element: Element, attribute: string, on: boolean): void {
@@ -26,6 +27,7 @@ function mark(element: Element, attribute: string, on: boolean): void {
 export function syncOrcaSidebarCarriers(root: ParentNode = document): void {
   for (const pane of root.querySelectorAll(SIDEBAR_ROOT_SELECTOR)) {
     mark(pane, ORCA_CARRIER_MARKS.tooltipRoot, pane.querySelector(TOOLTIP_SELECTOR) !== null)
+    mark(pane, ORCA_CARRIER_MARKS.dialogRoot, pane.querySelector(DIALOG_SELECTOR) !== null)
     for (const child of pane.children) {
       mark(child, ORCA_CARRIER_MARKS.tooltip, child.querySelector(TOOLTIP_SELECTOR) !== null)
       mark(child, ORCA_CARRIER_MARKS.dialog, child.querySelector(DIALOG_SELECTOR) !== null)
