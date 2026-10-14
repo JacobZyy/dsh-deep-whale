@@ -1277,11 +1277,11 @@ window.__ModuleLoader__.load({
 					if (!bottomOnly && !scrollHideEnabled()) return;
 					const seat = activeSeatOf(scrollport);
 					if (seat === null) return;
-					if (Date.now() < seatGestureUntil) return;
 					if (bottomOnly) {
 						applyBottomOnly(scrollport, seat);
 						return;
 					}
+					if (Date.now() < seatGestureUntil) return;
 					const distance = tailDistance(scrollport);
 					if (distance === null || distance <= 0) showSeat(seat);
 					else if (previousTop !== null && top > previousTop) showSeat(seat);

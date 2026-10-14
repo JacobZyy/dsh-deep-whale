@@ -82,8 +82,8 @@ function mountToBottomButton(scrollport: HTMLElement): HTMLButtonElement {
 }
 
 /** Seat 内挂一个溢出的草稿滚动盒（宿主 InputBar 的 capped `.scroll`）。 */
-function mountWithDraft(mode: string = 'scroll'): Fixture & { draft: HTMLElement } {
-  const fixture = mount(mode)
+function mountWithDraft(mode: string = 'scroll', bottomOnly = false): Fixture & { draft: HTMLElement } {
+  const fixture = mount(mode, bottomOnly)
   const draft = overflowBox(300, 700)
   fixture.input.remove()
   draft.append(fixture.input)
@@ -324,6 +324,17 @@ describe('maid composer bottom-only', () => {
 
     scrollTo(scrollport, SCROLLPORT_CONTENT_HEIGHT - SCROLLPORT_HEIGHT)
     expect(seat.hasAttribute('data-maid-composer-hidden')).toBe(false)
+    dispose()
+  })
+
+  it('settles a forwarded draft scroll by position inside the gesture window', () => {
+    const { scrollport, seat, input, dispose } = mountWithDraft('scroll', true)
+    scrollTo(scrollport, SCROLLPORT_CONTENT_HEIGHT - SCROLLPORT_HEIGHT)
+
+    // draft scroller at its edge; the host forwards the delta to the transcript
+    input.dispatchEvent(new WheelEvent('wheel', { deltaY: -120, bubbles: true }))
+    scrollTo(scrollport, 200) // the transcript tail leaves the viewport
+    expect(seat.hasAttribute('data-maid-composer-hidden')).toBe(true)
     dispose()
   })
 

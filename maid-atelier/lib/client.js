@@ -681,11 +681,11 @@ window.__ModuleLoader__.load({
 				const previousTop = lastTops.get(scrollport);
 				lastTops.set(scrollport, top);
 				observeGeometry(scrollport, seat);
-				if (Date.now() < seatGestureUntil) return;
 				if (mode === "bottom") {
 					applyBottomOnly(scrollport, seat);
 					return;
 				}
+				if (Date.now() < seatGestureUntil) return;
 				const distance = tailDistance(scrollport);
 				if (distance === null || distance <= 0) {
 					showSeat(seat);

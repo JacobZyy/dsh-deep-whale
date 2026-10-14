@@ -159,6 +159,27 @@ describe('ORCA LINK composer switches', () => {
     dispose()
   })
 
+  it('settles a forwarded draft scroll by position inside the gesture window', () => {
+    const { scrollport, seat } = mountConversation()
+    const input = seat.querySelector<HTMLElement>('[data-composer-input]')!
+    const draft = document.createElement('div')
+    draft.style.overflowY = 'auto'
+    Object.defineProperties(draft, {
+      clientHeight: { configurable: true, value: 300 },
+      scrollHeight: { configurable: true, value: 700 },
+    })
+    input.replaceWith(draft)
+    draft.append(input)
+    document.documentElement.setAttribute(BOTTOM_ONLY, 'on')
+    const dispose = installOrcaComposerMotion(document.body)
+
+    // draft scroller at its edge; the host forwards the delta to the transcript
+    input.dispatchEvent(new WheelEvent('wheel', { bubbles: true, deltaY: -120 }))
+    scrollTo(scrollport, 200) // the transcript tail leaves the viewport
+    expect(seat.hasAttribute('data-orca-composer-hidden')).toBe(true)
+    dispose()
+  })
+
   it('observes layout owners only while a visibility mode is on', async () => {
     const { scrollport } = mountConversation()
     defineScrollGeometry(scrollport, 300, 800)

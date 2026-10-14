@@ -285,11 +285,12 @@ export function installMaidComposerScroll(body: HTMLElement): () => void {
     lastTops.set(scrollport, top)
 
     observeGeometry(scrollport, seat)
-    if (Date.now() < seatGestureUntil) return
+    // Bottom-only is position-based, so forwarded draft scrolls still settle it.
     if (mode === 'bottom') {
       applyBottomOnly(scrollport, seat)
       return
     }
+    if (Date.now() < seatGestureUntil) return
 
     const distance = tailDistance(scrollport)
     if (distance === null || distance <= 0) {
