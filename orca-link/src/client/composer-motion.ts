@@ -11,7 +11,6 @@ const COMPOSER_SEAT_SELECTOR = '[data-composer-seat]'
 const COMPOSER_CARD_SELECTOR = '[data-composer-card]'
 const SCROLLPORT_SELECTOR = '[data-conversation-scroll]'
 const CHAT_FLOW_SELECTOR = '[data-chat-flow]'
-const TO_BOTTOM_SELECTOR = "button[class*='toBottom']"
 const NESTED_SCROLL_SURFACE_SELECTOR = [
   '[role="menu"]',
   '[role="listbox"]',
@@ -28,8 +27,7 @@ const MOTION_ATTRIBUTE = 'data-orca-composer-motion'
 const GHOST_ATTRIBUTE = 'data-orca-composer-ghost'
 const OUTSIDE_CHAT_ATTRIBUTE = 'data-orca-composer-outside-chat'
 
-const SCROLL_THRESHOLD = 10
-const BOTTOM_THRESHOLD = 24
+const TAIL_HIDE_THRESHOLD = 24
 const GHOST_LIFETIME_MS = 260
 const ENTER_LIFETIME_MS = 820
 // A submit press on the hero card only arms a snapshot of how that card looks
@@ -48,8 +46,8 @@ const SEAT_GESTURE_WINDOW_MS = 200
 
 interface ScrollBinding {
   lastTop: number | null
-  /** Connect the back-to-bottom observer only while bottom-only mode is on. */
-  syncBottomObserver: () => void
+  /** Observe layout owners only while a visibility mode is on. */
+  syncGeometryObserver: () => void
   dispose: () => void
 }
 
@@ -89,32 +87,12 @@ function composerBelongsToConversation(root: HTMLElement): boolean {
   return phase === 'active' && root.querySelector(CHAT_FLOW_SELECTOR) !== null
 }
 
-/**
- * 「输入框置底」以宿主「回到底部」按钮为基准：ui-chat 只在 reader 离开最新
- * 消息（内部 atBottom 为假）时才渲染它，所以按钮出现即表示应当收起输入框，
- * 按钮缺席表示宿主仍认为停在尾部。距底部的几何判定只在按钮尚未渲染（或宿主
- * 换掉该控件）时短路，正常滚到底部因此不会多一次 DOM 查询。
- */
-function atConversationBottom(scrollport: HTMLElement): boolean {
-  const distanceToBottom = scrollport.scrollHeight - scrollport.scrollTop - scrollport.clientHeight
-  if (distanceToBottom <= BOTTOM_THRESHOLD) return true
-  return scrollport.querySelector(TO_BOTTOM_SELECTOR) === null
-}
-
-/**
- * 回底控件的增删是置底判定唯一关心的结构变化。宿主在离开尾部之后才提交渲染，
- * 所以本模块读到的 scroll 事件往往仍对应旧 DOM，而该次事件之后可能不再有滚动：
- * 中键自动滚动与平滑滚动结束时就停在“按钮已经出现、输入框却没消失”。因此把
- * 控件的出现/消失本身当作事件源。transcript 内的高频变更先按容器排除。
- */
-function touchesBackToBottom(record: MutationRecord): boolean {
-  const target = record.target instanceof Element ? record.target : record.target.parentElement
-  if (target?.closest(CHAT_FLOW_SELECTOR) !== null) return false
-  for (const node of [...record.addedNodes, ...record.removedNodes]) {
-    if (node instanceof Element
-      && (node.matches(TO_BOTTOM_SELECTOR) || node.querySelector(TO_BOTTOM_SELECTOR) !== null)) return true
-  }
-  return false
+/** The sticky seat is outside the transcript; a tall ask must not count as unread history. */
+function tailDistance(scrollport: HTMLElement): number | null {
+  const flow = scrollport.querySelector<HTMLElement>(CHAT_FLOW_SELECTOR)
+  if (flow === null || scrollport.clientHeight <= 0) return null
+  const viewportBottom = scrollport.getBoundingClientRect().top + scrollport.clientTop + scrollport.clientHeight
+  return flow.getBoundingClientRect().bottom - viewportBottom
 }
 
 function wheelBelongsToNestedSurface(event: WheelEvent, scrollport: HTMLElement): boolean {
@@ -253,8 +231,9 @@ export function installOrcaComposerMotion(body: HTMLElement): () => void {
 
   /** 置底判定与写入：滚动方向不参与，位置即状态。 */
   const applyBottomOnly = (scrollport: HTMLElement, seat: HTMLElement): void => {
-    if (atConversationBottom(scrollport)) showSeat(seat)
-    else hideSeat(seat)
+    const distance = tailDistance(scrollport)
+    if (distance === null || distance <= 0) showSeat(seat)
+    else if (distance > TAIL_HIDE_THRESHOLD) hideSeat(seat)
   }
 
   /** 开关打开或会话换新时立刻按当前位置对齐，不必等待下一次滚动。 */
@@ -423,7 +402,11 @@ export function installOrcaComposerMotion(body: HTMLElement): () => void {
   }
 
   const bindScrollport = (scrollport: HTMLElement): void => {
-    if (scrollBindings.has(scrollport)) return
+    const existing = scrollBindings.get(scrollport)
+    if (existing !== undefined) {
+      existing.syncGeometryObserver()
+      return
+    }
     // A conversation switch replaces the scrollport; its listeners and observer
     // would keep the detached transcript alive, so drop them before binding.
     scrollBindings.forEach((binding, bound) => {
@@ -436,25 +419,20 @@ export function installOrcaComposerMotion(body: HTMLElement): () => void {
       // style forces a full-document layout. Establish the baseline on the
       // first reader interaction instead.
       lastTop: null,
-      syncBottomObserver: () => {},
+      syncGeometryObserver: () => {},
       dispose: () => {},
     }
 
     const onWheel = (event: WheelEvent): void => {
-      // 置底模式只看位置，滚轮方向不再驱动座内状态。
-      if (bottomOnlyEnabled() || !scrollHideEnabled()) return
-      // Checked before the delta threshold: touchpad inertia tails emit small
-      // deltas that still chain onto the transcript via the host's forwarding.
+      if (!bottomOnlyEnabled() && !scrollHideEnabled()) return
+      // Inertia tails also belong to the draft, even with tiny wheel deltas.
       if (wheelTargetsSeatDraft(event)) {
         seatGestureUntil = Date.now() + SEAT_GESTURE_WINDOW_MS
         return
       }
       if (wheelBelongsToNestedSurface(event, scrollport)) return
       if (binding.lastTop === null) binding.lastTop = scrollport.scrollTop
-      const seat = activeSeatOf(scrollport)
-      if (seat === null || Math.abs(event.deltaY) <= SCROLL_THRESHOLD) return
-      if (event.deltaY < 0) hideSeat(seat)
-      else showSeat(seat)
+      // Wheel direction alone does not imply that the transcript moved.
     }
     const onScroll = (): void => {
       const top = scrollport.scrollTop
@@ -464,42 +442,49 @@ export function installOrcaComposerMotion(body: HTMLElement): () => void {
       if (!bottomOnly && !scrollHideEnabled()) return
       const seat = activeSeatOf(scrollport)
       if (seat === null) return
+      // Bottom-only is position-based, so forwarded draft scrolls still settle it.
       if (bottomOnly) {
         applyBottomOnly(scrollport, seat)
         return
       }
       if (Date.now() < seatGestureUntil) return
-      const distanceToBottom = scrollport.scrollHeight - top - scrollport.clientHeight
-      if (distanceToBottom <= BOTTOM_THRESHOLD) showSeat(seat)
-      else if (previousTop !== null && top > previousTop + SCROLL_THRESHOLD) showSeat(seat)
-      else if (previousTop !== null && top < previousTop - SCROLL_THRESHOLD) hideSeat(seat)
+      const distance = tailDistance(scrollport)
+      if (distance === null || distance <= 0) showSeat(seat)
+      else if (previousTop !== null && top > previousTop) showSeat(seat)
+      else if (previousTop !== null && top < previousTop && distance > TAIL_HIDE_THRESHOLD) hideSeat(seat)
     }
-    // The host commits the back-to-bottom control after the scroll event this
-    // module already read, and a gesture may end on that very event (middle-click
-    // autoscroll, smooth scroll): the control is on screen while the seat stays
-    // visible until the next scroll. Reacting to the control's own insertion and
-    // removal removes that dependency on timing. The observer watches the whole
-    // transcript subtree, so it is connected only while the mode is on: with it
-    // off, every streamed node would still allocate a record for nothing.
-    const bottomObserver = new MutationObserver((records) => {
-      if (!bottomOnlyEnabled() || !records.some(touchesBackToBottom)) return
-      const seat = activeSeatOf(scrollport)
-      if (seat !== null) applyBottomOnly(scrollport, seat)
-    })
-    let bottomObserving = false
-    binding.syncBottomObserver = () => {
-      const on = bottomOnlyEnabled()
-      if (on === bottomObserving) return
-      bottomObserving = on
-      if (on) bottomObserver.observe(scrollport, { childList: true, subtree: true })
-      else bottomObserver.disconnect()
+    let geometryObserver: ResizeObserver | null = null
+    let observedSeat: HTMLElement | null = null
+    let observedFlow: HTMLElement | null = null
+    binding.syncGeometryObserver = () => {
+      const on = bottomOnlyEnabled() || scrollHideEnabled()
+      const seat = on ? activeSeatOf(scrollport) : null
+      const flow = on ? scrollport.querySelector<HTMLElement>(CHAT_FLOW_SELECTOR) : null
+      if (seat === observedSeat && flow === observedFlow) return
+      geometryObserver?.disconnect()
+      geometryObserver = null
+      observedSeat = seat
+      observedFlow = flow
+      if (seat === null || flow === null || typeof ResizeObserver === 'undefined') return
+      geometryObserver = new ResizeObserver(() => {
+        if (activeSeatOf(scrollport) !== seat) return
+        if (bottomOnlyEnabled()) applyBottomOnly(scrollport, seat)
+        else if (scrollHideEnabled()) {
+          // Stream growth alone must not hide a composer the reader is using.
+          const distance = tailDistance(scrollport)
+          if (distance === null || distance <= 0) showSeat(seat)
+        }
+      })
+      geometryObserver.observe(scrollport)
+      geometryObserver.observe(flow)
+      geometryObserver.observe(seat)
     }
-    binding.syncBottomObserver()
+    binding.syncGeometryObserver()
 
     scrollport.addEventListener('wheel', onWheel, { passive: true })
     scrollport.addEventListener('scroll', onScroll, { passive: true })
     binding.dispose = () => {
-      bottomObserver.disconnect()
+      geometryObserver?.disconnect()
       scrollport.removeEventListener('wheel', onWheel)
       scrollport.removeEventListener('scroll', onScroll)
     }
@@ -507,6 +492,11 @@ export function installOrcaComposerMotion(body: HTMLElement): () => void {
   }
 
   const synchronize = (): void => {
+    scrollBindings.forEach((binding, scrollport) => {
+      if (scrollport.isConnected) return
+      binding.dispose()
+      scrollBindings.delete(scrollport)
+    })
     doc.querySelectorAll<HTMLElement>(SCROLLPORT_SELECTOR).forEach((scrollport) => {
       bindScrollport(scrollport)
       const root = phaseRootOf(scrollport)
@@ -535,6 +525,7 @@ export function installOrcaComposerMotion(body: HTMLElement): () => void {
         seat.removeAttribute(ENTER_ATTRIBUTE)
         seat.removeAttribute(INTERACTIVE_ATTRIBUTE)
         blurSeat(seat)
+        scrollBindings.get(scrollport)?.syncGeometryObserver()
         return
       }
 
@@ -546,13 +537,15 @@ export function installOrcaComposerMotion(body: HTMLElement): () => void {
           || (previous === undefined && hasSeenHero)
         ) {
           // 置底模式下刚接管的座按当前位置落定：不在底部就不播入场，直接收起。
-          if (bottomOnlyEnabled() && !atConversationBottom(scrollport)) hideSeat(seat)
+          const distance = tailDistance(scrollport)
+          if (bottomOnlyEnabled() && distance !== null && distance > TAIL_HIDE_THRESHOLD) hideSeat(seat)
           else enterSeat(seat)
         }
       } else {
         if (!seat.hasAttribute(MANUAL_HIDDEN_ATTRIBUTE)) seat.removeAttribute(HIDDEN_ATTRIBUTE)
         if (phase === 'hero') seat.removeAttribute(ENTER_ATTRIBUTE)
       }
+      scrollBindings.get(scrollport)?.syncGeometryObserver()
     })
   }
 
@@ -573,7 +566,7 @@ export function installOrcaComposerMotion(body: HTMLElement): () => void {
     doc,
     [COMPOSER_SCROLL_HIDE_ATTRIBUTE, COMPOSER_BOTTOM_ONLY_ATTRIBUTE],
     () => {
-      scrollBindings.forEach(binding => binding.syncBottomObserver())
+      scrollBindings.forEach(binding => binding.syncGeometryObserver())
       if (bottomOnlyEnabled()) {
         synchronizeBottomOnly()
         return

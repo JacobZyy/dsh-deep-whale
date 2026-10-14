@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { installOrcaComposerCollapse } from '../src/client/composer-collapse.ts'
 import { installOrcaComposerMotion } from '../src/client/composer-motion.ts'
 
@@ -7,7 +7,31 @@ const SCROLL_HIDE = 'data-dsh-whale-orca-composer-scroll-hide'
 const BOTTOM_ONLY = 'data-dsh-whale-orca-composer-bottom-only'
 const HANDLES = 'data-dsh-whale-orca-composer-handles'
 
+const resizeObservers: FixtureResizeObserver[] = []
+class FixtureResizeObserver {
+  readonly targets = new Set<Element>()
+  constructor(private readonly callback: ResizeObserverCallback) { resizeObservers.push(this) }
+  observe(target: Element): void { this.targets.add(target) }
+  disconnect(): void { this.targets.clear() }
+  notify(): void { this.callback([], this as unknown as ResizeObserver) }
+}
+
+function resize(target: Element): void {
+  resizeObservers.filter(observer => observer.targets.has(target)).forEach(observer => { observer.notify() })
+}
+
+function scrollTo(scrollport: HTMLElement, top: number): void {
+  scrollport.scrollTop = top
+  scrollport.dispatchEvent(new Event('scroll'))
+}
+
+beforeEach(() => {
+  resizeObservers.length = 0
+  vi.stubGlobal('ResizeObserver', FixtureResizeObserver)
+})
+
 afterEach(() => {
+  vi.unstubAllGlobals()
   document.body.innerHTML = ''
   document.documentElement.removeAttribute(SCROLL_HIDE)
   document.documentElement.removeAttribute(BOTTOM_ONLY)
@@ -23,8 +47,11 @@ function mountConversation(): { scrollport: HTMLElement, seat: HTMLElement } {
       </div>
     </div>
   `
+  const scrollport = document.querySelector<HTMLElement>('[data-conversation-scroll]')!
+  defineScrollGeometry(scrollport, 300, 800)
+  scrollport.scrollTop = 500
   return {
-    scrollport: document.querySelector<HTMLElement>('[data-conversation-scroll]')!,
+    scrollport,
     seat: document.querySelector<HTMLElement>('[data-composer-seat]')!,
   }
 }
@@ -35,6 +62,9 @@ function defineScrollGeometry(scrollport: HTMLElement, height: number, contentHe
     clientHeight: { configurable: true, value: height },
     scrollHeight: { configurable: true, value: contentHeight },
   })
+  scrollport.getBoundingClientRect = () => DOMRect.fromRect({ height })
+  scrollport.querySelector<HTMLElement>('[data-chat-flow]')!.getBoundingClientRect =
+    () => DOMRect.fromRect({ height: contentHeight - 150 - scrollport.scrollTop })
 }
 
 /** 宿主 ui-chat 的「回到底部」控件：只在 reader 离开最新消息时渲染。 */
@@ -53,6 +83,10 @@ describe('ORCA LINK composer switches', () => {
     const dispose = installOrcaComposerMotion(document.body)
 
     scrollport.dispatchEvent(new WheelEvent('wheel', { deltaY: -40 }))
+    expect(seat.hasAttribute('data-orca-composer-hidden')).toBe(false)
+    scrollTo(scrollport, 460)
+    expect(seat.hasAttribute('data-orca-composer-hidden')).toBe(false)
+    scrollTo(scrollport, 300)
     expect(seat.hasAttribute('data-orca-composer-hidden')).toBe(true)
 
     // Switching off releases the seat the last gesture hid...
@@ -62,11 +96,13 @@ describe('ORCA LINK composer switches', () => {
 
     // ...and later scroll-up gestures leave it alone.
     scrollport.dispatchEvent(new WheelEvent('wheel', { deltaY: -40 }))
+    scrollTo(scrollport, 260)
     expect(seat.hasAttribute('data-orca-composer-hidden')).toBe(false)
 
     document.documentElement.setAttribute(SCROLL_HIDE, 'on')
     await flush()
     scrollport.dispatchEvent(new WheelEvent('wheel', { deltaY: -40 }))
+    scrollTo(scrollport, 200)
     expect(seat.hasAttribute('data-orca-composer-hidden')).toBe(true)
     dispose()
     expect(seat.hasAttribute('data-orca-composer-hidden')).toBe(false)
@@ -104,7 +140,7 @@ describe('ORCA LINK composer switches', () => {
     dispose()
   })
 
-  it('keeps the composer only while the host renders no back-to-bottom control', () => {
+  it('uses the transcript tail independently of the back-to-bottom control', () => {
     const { scrollport, seat } = mountConversation()
     defineScrollGeometry(scrollport, 300, 800)
     document.documentElement.setAttribute(BOTTOM_ONLY, 'on')
@@ -115,30 +151,53 @@ describe('ORCA LINK composer switches', () => {
     scrollport.dispatchEvent(new Event('scroll'))
     expect(seat.hasAttribute('data-orca-composer-hidden')).toBe(true)
 
-    // 宿主认为停在新消息处：控件卸载后即使仍停在原位置也放回来。
     toBottom.remove()
     scrollport.dispatchEvent(new Event('scroll'))
+    expect(seat.hasAttribute('data-orca-composer-hidden')).toBe(true)
+    scrollTo(scrollport, 350)
     expect(seat.hasAttribute('data-orca-composer-hidden')).toBe(false)
     dispose()
   })
 
-  it('watches the transcript for the back-to-bottom control only while bottom-only is on', async () => {
+  it('settles a forwarded draft scroll by position inside the gesture window', () => {
+    const { scrollport, seat } = mountConversation()
+    const input = seat.querySelector<HTMLElement>('[data-composer-input]')!
+    const draft = document.createElement('div')
+    draft.style.overflowY = 'auto'
+    Object.defineProperties(draft, {
+      clientHeight: { configurable: true, value: 300 },
+      scrollHeight: { configurable: true, value: 700 },
+    })
+    input.replaceWith(draft)
+    draft.append(input)
+    document.documentElement.setAttribute(BOTTOM_ONLY, 'on')
+    const dispose = installOrcaComposerMotion(document.body)
+
+    // draft scroller at its edge; the host forwards the delta to the transcript
+    input.dispatchEvent(new WheelEvent('wheel', { bubbles: true, deltaY: -120 }))
+    scrollTo(scrollport, 200) // the transcript tail leaves the viewport
+    expect(seat.hasAttribute('data-orca-composer-hidden')).toBe(true)
+    dispose()
+  })
+
+  it('observes layout owners only while a visibility mode is on', async () => {
     const { scrollport } = mountConversation()
     defineScrollGeometry(scrollport, 300, 800)
-    const observe = vi.spyOn(MutationObserver.prototype, 'observe')
-    const disconnect = vi.spyOn(MutationObserver.prototype, 'disconnect')
+    document.documentElement.setAttribute(SCROLL_HIDE, 'off')
+    const observe = vi.spyOn(FixtureResizeObserver.prototype, 'observe')
+    const disconnect = vi.spyOn(FixtureResizeObserver.prototype, 'disconnect')
     try {
-      const transcriptObservers = (): MutationObserver[] => observe.mock.calls
-        .map(([target], i) => (target === scrollport ? observe.mock.contexts[i] as MutationObserver : null))
-        .filter((observer): observer is MutationObserver => observer !== null)
+      const transcriptObservers = (): FixtureResizeObserver[] => observe.mock.calls
+        .map(([target], i) => (target === scrollport ? observe.mock.contexts[i] as FixtureResizeObserver : null))
+        .filter((observer): observer is FixtureResizeObserver => observer !== null)
       const dispose = installOrcaComposerMotion(document.body)
-      // Off by default: streamed transcript nodes must not allocate records.
       expect(transcriptObservers()).toHaveLength(0)
 
       document.documentElement.setAttribute(BOTTOM_ONLY, 'on')
       await flush()
       const [observer] = transcriptObservers()
       expect(observer).toBeDefined()
+      expect(observer.targets.size).toBe(3)
 
       document.documentElement.setAttribute(BOTTOM_ONLY, 'off')
       await flush()
@@ -163,22 +222,25 @@ describe('ORCA LINK composer switches', () => {
     dispose()
   })
 
-  it('reacts to the back-to-bottom control mounting after the scroll event', async () => {
+  it('keeps a long ask visible and reconciles its height without another scroll event', async () => {
     const { scrollport, seat } = mountConversation()
     defineScrollGeometry(scrollport, 300, 800)
     document.documentElement.setAttribute(BOTTOM_ONLY, 'on')
     const dispose = installOrcaComposerMotion(document.body)
 
-    scrollport.scrollTop = 200
-    scrollport.dispatchEvent(new Event('scroll'))
+    const flow = scrollport.querySelector<HTMLElement>('[data-chat-flow]')!
+    flow.getBoundingClientRect = () => DOMRect.fromRect({ height: 400 - scrollport.scrollTop })
+    scrollTo(scrollport, 380)
+    scrollTo(scrollport, 260)
+    scrollTo(scrollport, 80)
     expect(seat.hasAttribute('data-orca-composer-hidden')).toBe(false)
 
-    // 宿主在上一次滚动事件之后才提交控件：此后再没有滚动事件可以依赖。
-    const toBottom = mountToBottomButton(scrollport)
-    await flush()
+    scrollTo(scrollport, 75)
     expect(seat.hasAttribute('data-orca-composer-hidden')).toBe(true)
-
-    toBottom.remove()
+    scrollTo(scrollport, 80) // The hysteresis band retains the hidden state.
+    expect(seat.hasAttribute('data-orca-composer-hidden')).toBe(true)
+    flow.getBoundingClientRect = () => DOMRect.fromRect({ height: 290 })
+    resize(seat)
     await flush()
     expect(seat.hasAttribute('data-orca-composer-hidden')).toBe(false)
     dispose()
@@ -190,14 +252,22 @@ describe('ORCA LINK composer switches', () => {
     const dispose = installOrcaComposerMotion(document.body)
 
     scrollport.dispatchEvent(new WheelEvent('wheel', { deltaY: -40 }))
+    scrollTo(scrollport, 300)
     expect(seat.hasAttribute('data-orca-composer-hidden')).toBe(true)
 
-    // 接管的那一刻按当前位置落定（此时没有回到底部控件，宿主仍在尾部）。
+    // The mode switch samples the tail, independent of the host's control.
+    scrollport.scrollTop = 350
     document.documentElement.setAttribute(BOTTOM_ONLY, 'on')
     await flush()
     expect(seat.hasAttribute('data-orca-composer-hidden')).toBe(false)
 
     scrollport.dispatchEvent(new WheelEvent('wheel', { deltaY: -40 }))
+    expect(seat.hasAttribute('data-orca-composer-hidden')).toBe(false)
+    scrollTo(scrollport, 300)
+    expect(seat.hasAttribute('data-orca-composer-hidden')).toBe(true)
+    scrollTo(scrollport, 320)
+    expect(seat.hasAttribute('data-orca-composer-hidden')).toBe(true)
+    scrollTo(scrollport, 350)
     expect(seat.hasAttribute('data-orca-composer-hidden')).toBe(false)
     dispose()
   })

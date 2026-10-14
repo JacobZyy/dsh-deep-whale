@@ -106,8 +106,8 @@ export function installOrcaCustomization(root: HTMLElement = document.documentEl
         type: 'boolean',
         label: '上滚时隐藏输入框',
         labelEn: 'Hide the composer while scrolling up',
-        description: '向上翻阅对话时收起输入框，向下滚动或回到底部时再显示。',
-        descriptionEn: 'Tuck the composer away while reading back through the conversation; it returns when scrolling down or reaching the bottom.',
+        description: '正文末尾滚出视口后，上滚收起输入框；下滚或末尾回到视口时再显示。',
+        descriptionEn: 'Hide on upward scroll after the transcript tail leaves the viewport; reveal on downward scroll or when the tail returns.',
         defaultValue: true,
       },
       {
@@ -115,8 +115,8 @@ export function installOrcaCustomization(root: HTMLElement = document.documentEl
         type: 'boolean',
         label: '输入框只在底部显示',
         labelEn: 'Show the composer only at the conversation bottom',
-        description: '只在滚到最新消息末尾时显示输入框，向上回看时它自然隐去、回到底部再显现。开启后接管上面的上滚隐藏。',
-        descriptionEn: 'Show the composer only while the conversation sits at its newest message; it fades away while reading back and returns at the bottom. Takes over the scroll-up hiding above.',
+        description: '最新正文末尾仍在视口内时保留输入框，末尾滚出视口后隐去，回到视口内再显现。开启后接管上面的上滚隐藏。',
+        descriptionEn: 'Keep the composer while the transcript tail is within the viewport; hide after it leaves and reveal when it returns. Takes over the scroll-up hiding above.',
         defaultValue: false,
       },
       {
