@@ -20,7 +20,6 @@ const COMPOSER_SEAT_SELECTOR = '[data-composer-seat]'
 const CHAT_FLOW_SELECTOR = '[data-chat-flow]'
 const MODE_ATTRIBUTE = 'data-maid-composer-mode'
 const BOTTOM_ONLY_ATTRIBUTE = 'data-maid-composer-bottom-only'
-const TO_BOTTOM_SELECTOR = "button[class*='toBottom']"
 const HIDDEN_ATTRIBUTE = 'data-maid-composer-hidden'
 const INTERACTIVE_ATTRIBUTE = 'data-maid-composer-interactive'
 const NESTED_SCROLL_SURFACE_SELECTOR = [
@@ -32,8 +31,7 @@ const NESTED_SCROLL_SURFACE_SELECTOR = [
   '[data-floating-ui-portal]',
 ].join(',')
 
-const SCROLL_THRESHOLD = 10
-const BOTTOM_THRESHOLD = 24
+const TAIL_HIDE_THRESHOLD = 24
 // A wheel gesture on the draft scroller may keep scrolling the transcript for
 // a short while afterwards: the host's InputBar forwards the delta once the
 // capped draft box reaches its own edge, so the transcript scroll that follows
@@ -77,32 +75,12 @@ function activeMode(doc: Document): 'bottom' | 'scroll' | null {
   return scrollEnabled(doc) ? 'scroll' : null
 }
 
-/**
- * 置底模式以宿主「回到底部」按钮为基准：ui-chat 只在 reader 离开最新消息
- * （内部 atBottom 为假）时渲染该按钮，所以按钮出现即表示应当收起输入框，
- * 按钮缺席表示宿主仍认为停在尾部。距底部的几何判定只用于在按钮尚未渲染
- * （或宿主换掉该控件）时短路，正常滚到底部因此不会多一次 DOM 查询。
- */
-function atConversationBottom(scrollport: HTMLElement): boolean {
-  const distanceToBottom = scrollport.scrollHeight - scrollport.scrollTop - scrollport.clientHeight
-  if (distanceToBottom <= BOTTOM_THRESHOLD) return true
-  return scrollport.querySelector(TO_BOTTOM_SELECTOR) === null
-}
-
-/**
- * 回底控件的增删是置底判定唯一关心的结构变化。宿主在离开尾部之后才提交渲染，
- * 所以本模块读到的 scroll 事件往往仍对应旧 DOM，而该次事件之后可能不再有滚动：
- * 中键自动滚动与平滑滚动结束时就停在“按钮已经出现、输入框却没消失”。因此把
- * 控件的出现/消失本身当作事件源。transcript 内的高频变更先按容器排除。
- */
-function touchesBackToBottom(record: MutationRecord): boolean {
-  const target = record.target instanceof Element ? record.target : record.target.parentElement
-  if (target?.closest(CHAT_FLOW_SELECTOR) !== null) return false
-  for (const node of [...record.addedNodes, ...record.removedNodes]) {
-    if (node instanceof Element
-      && (node.matches(TO_BOTTOM_SELECTOR) || node.querySelector(TO_BOTTOM_SELECTOR) !== null)) return true
-  }
-  return false
+/** The sticky seat is outside the transcript; a tall ask must not count as unread history. */
+function tailDistance(scrollport: HTMLElement): number | null {
+  const flow = scrollport.querySelector<HTMLElement>(CHAT_FLOW_SELECTOR)
+  if (flow === null || scrollport.clientHeight <= 0) return null
+  const viewportBottom = scrollport.getBoundingClientRect().top + scrollport.clientTop + scrollport.clientHeight
+  return flow.getBoundingClientRect().bottom - viewportBottom
 }
 
 function activeSeatOf(scrollport: HTMLElement): HTMLElement | null {
@@ -228,56 +206,64 @@ export function installMaidComposerScroll(body: HTMLElement): () => void {
     if (activeMode(doc) === null) write(seat, INTERACTIVE_ATTRIBUTE, null)
   }
 
-  /** 置底判定与写入：滚动方向不参与，位置即状态。 */
+  // Separate hide/show boundaries keep the seat stable near the viewport edge.
   const applyBottomOnly = (scrollport: HTMLElement, seat: HTMLElement): void => {
-    if (atConversationBottom(scrollport)) showSeat(seat)
-    else hideSeat(seat)
+    const distance = tailDistance(scrollport)
+    if (distance === null || distance <= 0) showSeat(seat)
+    else if (distance > TAIL_HIDE_THRESHOLD) hideSeat(seat)
   }
 
-  // The host commits the back-to-bottom control after the scroll event this
-  // module already read, and a gesture may end on that very event (middle-click
-  // autoscroll, smooth scroll): the control is on screen while the seat stays
-  // visible until the next scroll. Reacting to the control's own insertion and
-  // removal removes that dependency on timing.
-  const bottomObservers = new Map<HTMLElement, MutationObserver>()
-  // A conversation switch replaces the scrollport, and an observer keeps its
-  // detached transcript alive, so dropped ones are released whenever a new
-  // scrollport is bound instead of accumulating for the life of the page.
-  const releaseDetachedObservers = (): void => {
-    bottomObservers.forEach((observer, scrollport) => {
-      if (scrollport.isConnected) return
-      observer.disconnect()
-      bottomObservers.delete(scrollport)
-    })
+  const geometryBindings = new Map<HTMLElement, { seat: HTMLElement, flow: HTMLElement, observer: ResizeObserver }>()
+  const releaseGeometryObservers = (): void => {
+    geometryBindings.forEach(binding => { binding.observer.disconnect() })
+    geometryBindings.clear()
   }
-  // The observers watch whole transcript subtrees; outside bottom-only mode
-  // they would only allocate a record for every streamed node.
-  const releaseBottomObservers = (): void => {
-    bottomObservers.forEach(observer => { observer.disconnect() })
-    bottomObservers.clear()
+  const reconcileGeometry = (scrollport: HTMLElement, seat: HTMLElement): void => {
+    if (!current() || activeSeatOf(scrollport) !== seat) return
+    if (activeMode(doc) === 'bottom') applyBottomOnly(scrollport, seat)
+    else if (activeMode(doc) === 'scroll') {
+      // Growing streamed content may move the tail off screen without reader
+      // intent. Only an upward scroll hides; layout changes can restore it.
+      const distance = tailDistance(scrollport)
+      if (distance === null || distance <= 0) showSeat(seat)
+    }
   }
-  const observeBottomControl = (scrollport: HTMLElement): void => {
-    if (bottomObservers.has(scrollport)) return
-    releaseDetachedObservers()
-    const observer = new MutationObserver((records) => {
-      if (!current() || activeMode(doc) !== 'bottom') return
-      if (!records.some(touchesBackToBottom)) return
-      const seat = activeSeatOf(scrollport)
-      if (seat !== null) applyBottomOnly(scrollport, seat)
+  const observeGeometry = (scrollport: HTMLElement, seat: HTMLElement): void => {
+    const flow = scrollport.querySelector<HTMLElement>(CHAT_FLOW_SELECTOR)
+    const previous = geometryBindings.get(scrollport)
+    if (previous?.seat === seat && previous.flow === flow) return
+    geometryBindings.forEach((binding, bound) => {
+      if (bound.isConnected) return
+      binding.observer.disconnect()
+      geometryBindings.delete(bound)
     })
-    observer.observe(scrollport, { childList: true, subtree: true })
-    bottomObservers.set(scrollport, observer)
+    previous?.observer.disconnect()
+    geometryBindings.delete(scrollport)
+    if (flow === null || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(() => { reconcileGeometry(scrollport, seat) })
+    geometryBindings.set(scrollport, { seat, flow, observer })
+    observer.observe(scrollport)
+    observer.observe(flow)
+    observer.observe(seat)
   }
 
-  /** 开关打开或会话换新时立刻对齐一次，不必等待下一次滚动。 */
-  const synchronizeBottomOnly = (): void => {
-    if (!current() || activeMode(doc) !== 'bottom') return
-    releaseDetachedObservers()
+  /** Observe only the three layout owners, including ask takeover and viewport resizing. */
+  const synchronizeGeometry = (): void => {
+    if (!current()) return
+    geometryBindings.forEach((binding, scrollport) => {
+      if (scrollport.isConnected && activeSeatOf(scrollport) === binding.seat) return
+      binding.observer.disconnect()
+      geometryBindings.delete(scrollport)
+    })
+    if (activeMode(doc) === null) {
+      releaseGeometryObservers()
+      return
+    }
     doc.querySelectorAll<HTMLElement>(SCROLLPORT_SELECTOR).forEach((scrollport) => {
       const seat = activeSeatOf(scrollport)
       if (seat === null) return
-      observeBottomControl(scrollport)
-      applyBottomOnly(scrollport, seat)
+      observeGeometry(scrollport, seat)
+      reconcileGeometry(scrollport, seat)
     })
   }
 
@@ -298,36 +284,31 @@ export function installMaidComposerScroll(body: HTMLElement): () => void {
     const previousTop = lastTops.get(scrollport)
     lastTops.set(scrollport, top)
 
+    observeGeometry(scrollport, seat)
+    if (Date.now() < seatGestureUntil) return
     if (mode === 'bottom') {
-      observeBottomControl(scrollport)
       applyBottomOnly(scrollport, seat)
       return
     }
 
-    if (Date.now() < seatGestureUntil) return
-
-    const distanceToBottom = scrollport.scrollHeight - top - scrollport.clientHeight
-    if (distanceToBottom <= BOTTOM_THRESHOLD) {
+    const distance = tailDistance(scrollport)
+    if (distance === null || distance <= 0) {
       showSeat(seat)
       return
     }
-    if (previousTop !== undefined && top > previousTop + SCROLL_THRESHOLD) showSeat(seat)
-    else if (previousTop !== undefined && top < previousTop - SCROLL_THRESHOLD) hideSeat(seat)
+    if (previousTop !== undefined && top > previousTop) showSeat(seat)
+    else if (previousTop !== undefined && top < previousTop && distance > TAIL_HIDE_THRESHOLD) hideSeat(seat)
   }
 
   const onWheel = (event: WheelEvent): void => {
     if (!current()) return
     const mode = activeMode(doc)
-    // 置底模式只看位置，滚轮方向不再驱动座内状态。
-    if (mode !== 'scroll') return
-    // Checked before the delta threshold: touchpad inertia tails emit small
-    // deltas that still chain onto the transcript via the host's forwarding.
+    if (mode === null) return
+    // Inertia tails also belong to the draft, even with tiny wheel deltas.
     if (wheelTargetsSeatDraft(event)) {
       seatGestureUntil = Date.now() + SEAT_GESTURE_WINDOW_MS
       return
     }
-    if (Math.abs(event.deltaY) <= SCROLL_THRESHOLD) return
-
     for (const candidate of event.composedPath()) {
       if (!(candidate instanceof HTMLElement) || !candidate.matches(SCROLLPORT_SELECTOR)) continue
       const scrollport = candidate
@@ -335,8 +316,7 @@ export function installMaidComposerScroll(body: HTMLElement): () => void {
       const seat = activeSeatOf(scrollport)
       if (seat === null) return
       if (!lastTops.has(scrollport)) lastTops.set(scrollport, scrollport.scrollTop)
-      if (event.deltaY < 0) hideSeat(seat)
-      else showSeat(seat)
+      // Wheel direction alone does not imply that the transcript moved.
       return
     }
   }
@@ -367,14 +347,35 @@ export function installMaidComposerScroll(body: HTMLElement): () => void {
     if (!records.some(record => record.type === 'attributes'
       && (record.attributeName === MODE_ATTRIBUTE || record.attributeName === BOTTOM_ONLY_ATTRIBUTE))) return
     const mode = activeMode(doc)
-    if (mode !== 'bottom') releaseBottomObservers()
     if (mode === null) clearSeatStates()
-    else if (mode === 'bottom') synchronizeBottomOnly()
+    syncStructureObserver()
+    synchronizeGeometry()
   })
   stateObserver.observe(doc.documentElement, {
     attributes: true,
     attributeFilter: [MODE_ATTRIBUTE, BOTTOM_ONLY_ATTRIBUTE],
   })
+
+  const structureObserver = new MutationObserver((records) => {
+    if (!current()) return
+    const hooks = `${SCROLLPORT_SELECTOR}, ${COMPOSER_SEAT_SELECTOR}, ${CHAT_FLOW_SELECTOR}`
+    if (!records.some(record => {
+      const target = record.target instanceof Element ? record.target : record.target.parentElement
+      if (target?.closest(`${CHAT_FLOW_SELECTOR}, ${COMPOSER_SEAT_SELECTOR}`)) return false
+      if (record.type === 'attributes') return true
+      return [...record.addedNodes, ...record.removedNodes].some(node =>
+        node instanceof Element && (node.matches(hooks) || node.querySelector(hooks) !== null))
+    })) return
+    synchronizeGeometry()
+  })
+  let observingStructure = false
+  const syncStructureObserver = (): void => {
+    const on = activeMode(doc) !== null
+    if (on === observingStructure) return
+    observingStructure = on
+    if (on) structureObserver.observe(body, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-phase'] })
+    else structureObserver.disconnect()
+  }
 
   // Scroll does not bubble; capture on the document still sees each
   // scrollport's events, so no per-element binding lifecycle is needed.
@@ -382,11 +383,13 @@ export function installMaidComposerScroll(body: HTMLElement): () => void {
   doc.addEventListener('wheel', onWheel, true)
   doc.addEventListener('focusin', onFocusIn, true)
   doc.addEventListener('focusout', onFocusOut, true)
-  synchronizeBottomOnly()
+  syncStructureObserver()
+  synchronizeGeometry()
 
   return () => {
     stateObserver.disconnect()
-    releaseBottomObservers()
+    structureObserver.disconnect()
+    releaseGeometryObservers()
     doc.removeEventListener('scroll', onScroll, true)
     doc.removeEventListener('wheel', onWheel, true)
     doc.removeEventListener('focusin', onFocusIn, true)

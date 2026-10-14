@@ -1166,6 +1166,9 @@ describe('Orca Link skin apply', () => {
       scrollHeight: { configurable: true, value: 1_400 },
       clientHeight: { configurable: true, value: 400 },
     })
+    scrollport.getBoundingClientRect = () => DOMRect.fromRect({ height: 400 })
+    document.querySelector<HTMLElement>('[data-chat-flow]')!.getBoundingClientRect =
+      () => DOMRect.fromRect({ height: 1_200 - scrollTop })
 
     fiber = await mount()
     expect(scrollTopReads).toBe(0)
@@ -1178,9 +1181,14 @@ describe('Orca Link skin apply', () => {
     expect(seat.hasAttribute('data-orca-composer-hidden')).toBe(false)
     expect(scrollTopReads).toBe(1)
     scrollport.dispatchEvent(new WheelEvent('wheel', { bubbles: true, deltaY: -100 }))
+    expect(seat.hasAttribute('data-orca-composer-hidden')).toBe(false)
+    scrollTop = 500
+    scrollport.dispatchEvent(new Event('scroll'))
     expect(seat.hasAttribute('data-orca-composer-hidden')).toBe(true)
     expect(seat.hasAttribute('data-orca-composer-motion')).toBe(true)
     scrollport.dispatchEvent(new WheelEvent('wheel', { bubbles: true, deltaY: 100 }))
+    scrollTop = 600
+    scrollport.dispatchEvent(new Event('scroll'))
     expect(seat.hasAttribute('data-orca-composer-hidden')).toBe(false)
 
     const input = document.querySelector<HTMLElement>('[data-composer-input]')!
@@ -1240,6 +1248,9 @@ describe('Orca Link skin apply', () => {
       scrollHeight: { configurable: true, value: 1_400 },
       clientHeight: { configurable: true, value: 400 },
     })
+    scrollport.getBoundingClientRect = () => DOMRect.fromRect({ height: 400 })
+    document.querySelector<HTMLElement>('[data-chat-flow]')!.getBoundingClientRect =
+      () => DOMRect.fromRect({ height: 1_200 - scrollTop })
 
     fiber = await mount()
 

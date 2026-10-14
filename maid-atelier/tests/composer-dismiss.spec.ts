@@ -78,7 +78,15 @@ describe('maid composer hide/collapse dialog hand-off', () => {
     document.documentElement.setAttribute(MODE, 'scroll')
     const disposeScroll = installMaidComposerScroll(document.body)
 
-    seat.closest('[data-conversation-scroll]')!.dispatchEvent(new WheelEvent('wheel', { bubbles: true, deltaY: -80 }))
+    const scrollport = seat.closest<HTMLElement>('[data-conversation-scroll]')!
+    Object.defineProperty(scrollport, 'clientHeight', { configurable: true, value: 300 })
+    scrollport.getBoundingClientRect = () => DOMRect.fromRect({ height: 300 })
+    scrollport.querySelector<HTMLElement>('[data-chat-flow]')!.getBoundingClientRect =
+      () => DOMRect.fromRect({ height: 650 - scrollport.scrollTop })
+    scrollport.scrollTop = 400
+    scrollport.dispatchEvent(new WheelEvent('wheel', { bubbles: true, deltaY: -80 }))
+    scrollport.scrollTop = 300
+    scrollport.dispatchEvent(new Event('scroll'))
     await nextMicrotask()
     expect(seat.hasAttribute(HIDDEN)).toBe(true)
     expect(pill.getAttribute('aria-expanded')).toBe('false')

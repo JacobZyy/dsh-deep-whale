@@ -458,7 +458,6 @@ window.__ModuleLoader__.load({
 		const CHAT_FLOW_SELECTOR = "[data-chat-flow]";
 		const MODE_ATTRIBUTE = "data-maid-composer-mode";
 		const BOTTOM_ONLY_ATTRIBUTE = "data-maid-composer-bottom-only";
-		const TO_BOTTOM_SELECTOR = "button[class*='toBottom']";
 		const HIDDEN_ATTRIBUTE = "data-maid-composer-hidden";
 		const INTERACTIVE_ATTRIBUTE = "data-maid-composer-interactive";
 		const NESTED_SCROLL_SURFACE_SELECTOR = [
@@ -469,8 +468,7 @@ window.__ModuleLoader__.load({
 			"[data-radix-popper-content-wrapper]",
 			"[data-floating-ui-portal]"
 		].join(",");
-		const SCROLL_THRESHOLD = 10;
-		const BOTTOM_THRESHOLD = 24;
+		const TAIL_HIDE_THRESHOLD = 24;
 		const SEAT_GESTURE_WINDOW_MS = 200;
 		const ownershipByDocument = /* @__PURE__ */ new WeakMap();
 		function phaseRootOf(element) {
@@ -493,26 +491,12 @@ window.__ModuleLoader__.load({
 			if (bottomOnlyEnabled(doc)) return "bottom";
 			return scrollEnabled(doc) ? "scroll" : null;
 		}
-		/**
-		* 置底模式以宿主「回到底部」按钮为基准：ui-chat 只在 reader 离开最新消息
-		* （内部 atBottom 为假）时渲染该按钮，所以按钮出现即表示应当收起输入框，
-		* 按钮缺席表示宿主仍认为停在尾部。距底部的几何判定只用于在按钮尚未渲染
-		* （或宿主换掉该控件）时短路，正常滚到底部因此不会多一次 DOM 查询。
-		*/
-		function atConversationBottom(scrollport) {
-			if (scrollport.scrollHeight - scrollport.scrollTop - scrollport.clientHeight <= BOTTOM_THRESHOLD) return true;
-			return scrollport.querySelector(TO_BOTTOM_SELECTOR) === null;
-		}
-		/**
-		* 回底控件的增删是置底判定唯一关心的结构变化。宿主在离开尾部之后才提交渲染，
-		* 所以本模块读到的 scroll 事件往往仍对应旧 DOM，而该次事件之后可能不再有滚动：
-		* 中键自动滚动与平滑滚动结束时就停在“按钮已经出现、输入框却没消失”。因此把
-		* 控件的出现/消失本身当作事件源。transcript 内的高频变更先按容器排除。
-		*/
-		function touchesBackToBottom(record) {
-			if ((record.target instanceof Element ? record.target : record.target.parentElement)?.closest(CHAT_FLOW_SELECTOR) !== null) return false;
-			for (const node of [...record.addedNodes, ...record.removedNodes]) if (node instanceof Element && (node.matches(TO_BOTTOM_SELECTOR) || node.querySelector(TO_BOTTOM_SELECTOR) !== null)) return true;
-			return false;
+		/** The sticky seat is outside the transcript; a tall ask must not count as unread history. */
+		function tailDistance(scrollport) {
+			const flow = scrollport.querySelector(CHAT_FLOW_SELECTOR);
+			if (flow === null || scrollport.clientHeight <= 0) return null;
+			const viewportBottom = scrollport.getBoundingClientRect().top + scrollport.clientTop + scrollport.clientHeight;
+			return flow.getBoundingClientRect().bottom - viewportBottom;
 		}
 		function activeSeatOf(scrollport) {
 			if (phaseRootOf(scrollport)?.dataset.phase !== "active") return null;
@@ -621,49 +605,67 @@ window.__ModuleLoader__.load({
 				write(seat, INTERACTIVE_ATTRIBUTE, "");
 				if (activeMode(doc) === null) write(seat, INTERACTIVE_ATTRIBUTE, null);
 			};
-			/** 置底判定与写入：滚动方向不参与，位置即状态。 */
 			const applyBottomOnly = (scrollport, seat) => {
-				if (atConversationBottom(scrollport)) showSeat(seat);
-				else hideSeat(seat);
+				const distance = tailDistance(scrollport);
+				if (distance === null || distance <= 0) showSeat(seat);
+				else if (distance > TAIL_HIDE_THRESHOLD) hideSeat(seat);
 			};
-			const bottomObservers = /* @__PURE__ */ new Map();
-			const releaseDetachedObservers = () => {
-				bottomObservers.forEach((observer, scrollport) => {
-					if (scrollport.isConnected) return;
-					observer.disconnect();
-					bottomObservers.delete(scrollport);
+			const geometryBindings = /* @__PURE__ */ new Map();
+			const releaseGeometryObservers = () => {
+				geometryBindings.forEach((binding) => {
+					binding.observer.disconnect();
 				});
+				geometryBindings.clear();
 			};
-			const releaseBottomObservers = () => {
-				bottomObservers.forEach((observer) => {
-					observer.disconnect();
-				});
-				bottomObservers.clear();
+			const reconcileGeometry = (scrollport, seat) => {
+				if (!current() || activeSeatOf(scrollport) !== seat) return;
+				if (activeMode(doc) === "bottom") applyBottomOnly(scrollport, seat);
+				else if (activeMode(doc) === "scroll") {
+					const distance = tailDistance(scrollport);
+					if (distance === null || distance <= 0) showSeat(seat);
+				}
 			};
-			const observeBottomControl = (scrollport) => {
-				if (bottomObservers.has(scrollport)) return;
-				releaseDetachedObservers();
-				const observer = new MutationObserver((records) => {
-					if (!current() || activeMode(doc) !== "bottom") return;
-					if (!records.some(touchesBackToBottom)) return;
-					const seat = activeSeatOf(scrollport);
-					if (seat !== null) applyBottomOnly(scrollport, seat);
+			const observeGeometry = (scrollport, seat) => {
+				const flow = scrollport.querySelector(CHAT_FLOW_SELECTOR);
+				const previous = geometryBindings.get(scrollport);
+				if (previous?.seat === seat && previous.flow === flow) return;
+				geometryBindings.forEach((binding, bound) => {
+					if (bound.isConnected) return;
+					binding.observer.disconnect();
+					geometryBindings.delete(bound);
 				});
-				observer.observe(scrollport, {
-					childList: true,
-					subtree: true
+				previous?.observer.disconnect();
+				geometryBindings.delete(scrollport);
+				if (flow === null || typeof ResizeObserver === "undefined") return;
+				const observer = new ResizeObserver(() => {
+					reconcileGeometry(scrollport, seat);
 				});
-				bottomObservers.set(scrollport, observer);
+				geometryBindings.set(scrollport, {
+					seat,
+					flow,
+					observer
+				});
+				observer.observe(scrollport);
+				observer.observe(flow);
+				observer.observe(seat);
 			};
-			/** 开关打开或会话换新时立刻对齐一次，不必等待下一次滚动。 */
-			const synchronizeBottomOnly = () => {
-				if (!current() || activeMode(doc) !== "bottom") return;
-				releaseDetachedObservers();
+			/** Observe only the three layout owners, including ask takeover and viewport resizing. */
+			const synchronizeGeometry = () => {
+				if (!current()) return;
+				geometryBindings.forEach((binding, scrollport) => {
+					if (scrollport.isConnected && activeSeatOf(scrollport) === binding.seat) return;
+					binding.observer.disconnect();
+					geometryBindings.delete(scrollport);
+				});
+				if (activeMode(doc) === null) {
+					releaseGeometryObservers();
+					return;
+				}
 				doc.querySelectorAll(SCROLLPORT_SELECTOR).forEach((scrollport) => {
 					const seat = activeSeatOf(scrollport);
 					if (seat === null) return;
-					observeBottomControl(scrollport);
-					applyBottomOnly(scrollport, seat);
+					observeGeometry(scrollport, seat);
+					reconcileGeometry(scrollport, seat);
 				});
 			};
 			let seatGestureUntil = 0;
@@ -678,36 +680,33 @@ window.__ModuleLoader__.load({
 				const top = scrollport.scrollTop;
 				const previousTop = lastTops.get(scrollport);
 				lastTops.set(scrollport, top);
+				observeGeometry(scrollport, seat);
+				if (Date.now() < seatGestureUntil) return;
 				if (mode === "bottom") {
-					observeBottomControl(scrollport);
 					applyBottomOnly(scrollport, seat);
 					return;
 				}
-				if (Date.now() < seatGestureUntil) return;
-				if (scrollport.scrollHeight - top - scrollport.clientHeight <= BOTTOM_THRESHOLD) {
+				const distance = tailDistance(scrollport);
+				if (distance === null || distance <= 0) {
 					showSeat(seat);
 					return;
 				}
-				if (previousTop !== void 0 && top > previousTop + SCROLL_THRESHOLD) showSeat(seat);
-				else if (previousTop !== void 0 && top < previousTop - SCROLL_THRESHOLD) hideSeat(seat);
+				if (previousTop !== void 0 && top > previousTop) showSeat(seat);
+				else if (previousTop !== void 0 && top < previousTop && distance > TAIL_HIDE_THRESHOLD) hideSeat(seat);
 			};
 			const onWheel = (event) => {
 				if (!current()) return;
-				if (activeMode(doc) !== "scroll") return;
+				if (activeMode(doc) === null) return;
 				if (wheelTargetsSeatDraft(event)) {
 					seatGestureUntil = Date.now() + SEAT_GESTURE_WINDOW_MS;
 					return;
 				}
-				if (Math.abs(event.deltaY) <= SCROLL_THRESHOLD) return;
 				for (const candidate of event.composedPath()) {
 					if (!(candidate instanceof HTMLElement) || !candidate.matches(SCROLLPORT_SELECTOR)) continue;
 					const scrollport = candidate;
 					if (wheelBelongsToNestedSurface(event, scrollport)) return;
-					const seat = activeSeatOf(scrollport);
-					if (seat === null) return;
+					if (activeSeatOf(scrollport) === null) return;
 					if (!lastTops.has(scrollport)) lastTops.set(scrollport, scrollport.scrollTop);
-					if (event.deltaY < 0) hideSeat(seat);
-					else showSeat(seat);
 					return;
 				}
 			};
@@ -730,23 +729,47 @@ window.__ModuleLoader__.load({
 			const stateObserver = new MutationObserver((records) => {
 				if (!current()) return;
 				if (!records.some((record) => record.type === "attributes" && (record.attributeName === MODE_ATTRIBUTE || record.attributeName === BOTTOM_ONLY_ATTRIBUTE))) return;
-				const mode = activeMode(doc);
-				if (mode !== "bottom") releaseBottomObservers();
-				if (mode === null) clearSeatStates();
-				else if (mode === "bottom") synchronizeBottomOnly();
+				if (activeMode(doc) === null) clearSeatStates();
+				syncStructureObserver();
+				synchronizeGeometry();
 			});
 			stateObserver.observe(doc.documentElement, {
 				attributes: true,
 				attributeFilter: [MODE_ATTRIBUTE, BOTTOM_ONLY_ATTRIBUTE]
 			});
+			const structureObserver = new MutationObserver((records) => {
+				if (!current()) return;
+				const hooks = `${SCROLLPORT_SELECTOR}, ${COMPOSER_SEAT_SELECTOR}, ${CHAT_FLOW_SELECTOR}`;
+				if (!records.some((record) => {
+					if ((record.target instanceof Element ? record.target : record.target.parentElement)?.closest(`${CHAT_FLOW_SELECTOR}, ${COMPOSER_SEAT_SELECTOR}`)) return false;
+					if (record.type === "attributes") return true;
+					return [...record.addedNodes, ...record.removedNodes].some((node) => node instanceof Element && (node.matches(hooks) || node.querySelector(hooks) !== null));
+				})) return;
+				synchronizeGeometry();
+			});
+			let observingStructure = false;
+			const syncStructureObserver = () => {
+				const on = activeMode(doc) !== null;
+				if (on === observingStructure) return;
+				observingStructure = on;
+				if (on) structureObserver.observe(body, {
+					childList: true,
+					subtree: true,
+					attributes: true,
+					attributeFilter: ["data-phase"]
+				});
+				else structureObserver.disconnect();
+			};
 			doc.addEventListener("scroll", onScroll, true);
 			doc.addEventListener("wheel", onWheel, true);
 			doc.addEventListener("focusin", onFocusIn, true);
 			doc.addEventListener("focusout", onFocusOut, true);
-			synchronizeBottomOnly();
+			syncStructureObserver();
+			synchronizeGeometry();
 			return () => {
 				stateObserver.disconnect();
-				releaseBottomObservers();
+				structureObserver.disconnect();
+				releaseGeometryObservers();
 				doc.removeEventListener("scroll", onScroll, true);
 				doc.removeEventListener("wheel", onWheel, true);
 				doc.removeEventListener("focusin", onFocusIn, true);
@@ -1490,8 +1513,8 @@ window.__ModuleLoader__.load({
 						type: "select",
 						label: "输入框显示方式",
 						labelEn: "Composer visibility mode",
-						description: "始终显示；空态胶囊在输入框为空且未聚焦时收起为简约胶囊；滚动显隐在上滚回顾时隐去、下滚渐现。",
-						descriptionEn: "Always visible; the idle capsule collapses to a slim capsule while the composer is empty and unfocused; scroll mode hides it when scrolling up to review and reveals it when scrolling down.",
+						description: "始终显示；空态胶囊在输入框为空且未聚焦时收起为简约胶囊；滚动显隐在正文末尾滚出视口后上滚隐去，下滚或末尾回到视口时渐现。",
+						descriptionEn: "Always visible; the idle capsule collapses while empty and unfocused; scroll mode hides on upward scroll after the transcript tail leaves the viewport, and reveals on downward scroll or when the tail returns.",
 						defaultValue: "persistent",
 						options: [
 							{
@@ -1516,8 +1539,8 @@ window.__ModuleLoader__.load({
 						type: "boolean",
 						label: "输入框只在底部显示",
 						labelEn: "Show the composer only at the conversation bottom",
-						description: "只在滚到最新消息末尾时显示输入框，向上回看时它自然隐去、回到底部再显现。开启后接管上面的「上滚隐去 · 下滚渐现」。",
-						descriptionEn: "Show the composer only while the conversation sits at its newest message; it fades away while reading back and returns at the bottom. Takes over the scroll mode above.",
+						description: "最新正文末尾仍在视口内时保留输入框，末尾滚出视口后隐去，回到视口内再显现。开启后接管上面的「上滚隐去 · 下滚渐现」。",
+						descriptionEn: "Keep the composer while the transcript tail is within the viewport; hide after it leaves and reveal when it returns. Takes over the scroll mode above.",
 						defaultValue: false
 					},
 					{

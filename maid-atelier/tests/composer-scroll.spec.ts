@@ -7,6 +7,29 @@ const SCROLLPORT_CONTENT_HEIGHT = 800
 const SWITCH = 'data-maid-composer-mode'
 const BOTTOM_SWITCH = 'data-maid-composer-bottom-only'
 
+const resizeObservers: FixtureResizeObserver[] = []
+class FixtureResizeObserver {
+  readonly targets = new Set<Element>()
+  constructor(private readonly callback: ResizeObserverCallback) { resizeObservers.push(this) }
+  observe(target: Element): void { this.targets.add(target) }
+  disconnect(): void { this.targets.clear() }
+  notify(): void { this.callback([], this as unknown as ResizeObserver) }
+}
+
+function resize(target: Element): void {
+  resizeObservers.filter(observer => observer.targets.has(target)).forEach(observer => { observer.notify() })
+}
+
+function defineGeometry(scrollport: HTMLElement): void {
+  Object.defineProperties(scrollport, {
+    clientHeight: { configurable: true, value: SCROLLPORT_HEIGHT },
+    scrollHeight: { configurable: true, value: SCROLLPORT_CONTENT_HEIGHT },
+  })
+  scrollport.getBoundingClientRect = () => DOMRect.fromRect({ height: SCROLLPORT_HEIGHT })
+  const flow = scrollport.querySelector<HTMLElement>('[data-chat-flow]')!
+  flow.getBoundingClientRect = () => DOMRect.fromRect({ height: 650 - scrollport.scrollTop })
+}
+
 interface Fixture {
   root: HTMLElement
   scrollport: HTMLElement
@@ -31,10 +54,6 @@ function mount(mode: string = 'scroll', bottomOnly = false): Fixture {
   const scrollport = document.createElement('div')
   scrollport.dataset.conversationScroll = ''
   const phaseBody = document.createElement('div')
-  Object.defineProperties(scrollport, {
-    clientHeight: { configurable: true, value: SCROLLPORT_HEIGHT },
-    scrollHeight: { configurable: true, value: SCROLLPORT_CONTENT_HEIGHT },
-  })
   const flow = document.createElement('div')
   flow.dataset.chatFlow = ''
   const seat = document.createElement('div')
@@ -44,6 +63,8 @@ function mount(mode: string = 'scroll', bottomOnly = false): Fixture {
   input.setAttribute('contenteditable', 'true')
   seat.append(input)
   scrollport.append(flow, seat)
+  defineGeometry(scrollport)
+  scrollport.scrollTop = SCROLLPORT_CONTENT_HEIGHT - SCROLLPORT_HEIGHT
   phaseBody.append(scrollport)
   root.append(phaseBody)
   document.body.append(root)
@@ -84,12 +105,15 @@ function nextMicrotask(): Promise<void> {
 }
 
 beforeEach(() => {
+  resizeObservers.length = 0
+  vi.stubGlobal('ResizeObserver', FixtureResizeObserver)
   document.body.innerHTML = ''
   document.documentElement.removeAttribute(SWITCH)
   document.documentElement.removeAttribute(BOTTOM_SWITCH)
 })
 
 afterEach(() => {
+  vi.unstubAllGlobals()
   document.documentElement.removeAttribute(SWITCH)
   document.documentElement.removeAttribute(BOTTOM_SWITCH)
 })
@@ -117,15 +141,21 @@ describe('maid composer scroll-intent', () => {
     dispose()
   })
 
-  it('steers by wheel direction and ignores micro-wheel deltas', () => {
+  it('keeps a long ask visible until the transcript tail leaves the viewport', () => {
     const { scrollport, seat, dispose } = mount()
+    const flow = scrollport.querySelector<HTMLElement>('[data-chat-flow]')!
+    // A 400px ask reserves room below a 400px transcript.
+    flow.getBoundingClientRect = () => DOMRect.fromRect({ height: 400 - scrollport.scrollTop })
     wheel(scrollport, -120)
-    expect(seat.hasAttribute('data-maid-composer-hidden')).toBe(true)
-
-    wheel(scrollport, 120)
     expect(seat.hasAttribute('data-maid-composer-hidden')).toBe(false)
-
-    wheel(scrollport, 6)
+    scrollTo(scrollport, 380)
+    scrollTo(scrollport, 260)
+    scrollTo(scrollport, 100)
+    scrollTo(scrollport, 80) // Tail is 20px below the viewport: retain visibility.
+    expect(seat.hasAttribute('data-maid-composer-hidden')).toBe(false)
+    scrollTo(scrollport, 75)
+    expect(seat.hasAttribute('data-maid-composer-hidden')).toBe(true)
+    scrollTo(scrollport, 76) // Actual downward movement restores scroll mode.
     expect(seat.hasAttribute('data-maid-composer-hidden')).toBe(false)
     dispose()
   })
@@ -233,14 +263,17 @@ describe('maid composer scroll-intent', () => {
     }
   })
 
-  it('wheel on a short draft (no overflow) still steers by direction', () => {
+  it('wheel on a short draft follows actual transcript movement', () => {
     const { scrollport, seat, input, dispose } = mount()
     scrollTo(scrollport, 400)
 
     input.dispatchEvent(new WheelEvent('wheel', { deltaY: -120, bubbles: true }))
+    expect(seat.hasAttribute('data-maid-composer-hidden')).toBe(false)
+    scrollTo(scrollport, 280)
     expect(seat.hasAttribute('data-maid-composer-hidden')).toBe(true)
 
     input.dispatchEvent(new WheelEvent('wheel', { deltaY: 120, bubbles: true }))
+    scrollTo(scrollport, 400)
     expect(seat.hasAttribute('data-maid-composer-hidden')).toBe(false)
     dispose()
   })
@@ -256,6 +289,7 @@ describe('maid composer scroll-intent', () => {
     expect(seat.hasAttribute('data-maid-composer-hidden')).toBe(true)
 
     wheel(scrollport, 120)
+    scrollTo(scrollport, 320)
     expect(seat.hasAttribute('data-maid-composer-hidden')).toBe(false)
     disposeNewer()
     expect(seat.hasAttribute('data-maid-composer-hidden')).toBe(false)
@@ -263,7 +297,7 @@ describe('maid composer scroll-intent', () => {
 })
 
 describe('maid composer bottom-only', () => {
-  it('hides the seat while the host renders its back-to-bottom control and shows it again at the tail', () => {
+  it('uses the transcript tail independently of the back-to-bottom control', () => {
     const { scrollport, seat, dispose } = mount('persistent', true)
     const toBottom = mountToBottomButton(scrollport)
 
@@ -272,6 +306,8 @@ describe('maid composer bottom-only', () => {
 
     toBottom.remove()
     scrollTo(scrollport, 180)
+    expect(seat.hasAttribute('data-maid-composer-hidden')).toBe(true)
+    scrollTo(scrollport, 350)
     expect(seat.hasAttribute('data-maid-composer-hidden')).toBe(false)
     dispose()
   })
@@ -283,7 +319,7 @@ describe('maid composer bottom-only', () => {
     scrollTo(scrollport, 200) // 上滚回顾：位置在最新消息之外
     expect(seat.hasAttribute('data-maid-composer-hidden')).toBe(true)
 
-    scrollTo(scrollport, 350) // 下滚但尚未回到末尾：不再渐现
+    scrollTo(scrollport, 300) // 下滚但正文末尾尚未回到视口：不再渐现
     expect(seat.hasAttribute('data-maid-composer-hidden')).toBe(true)
 
     scrollTo(scrollport, SCROLLPORT_CONTENT_HEIGHT - SCROLLPORT_HEIGHT)
@@ -307,29 +343,35 @@ describe('maid composer bottom-only', () => {
     dispose()
   })
 
-  it('hides the seat when the control mounts after the scroll event (middle-click autoscroll)', async () => {
+  it('reconciles an ask height change without another scroll event', async () => {
     const { scrollport, seat, dispose } = mount('persistent', true)
     scrollTo(scrollport, 200)
-    expect(seat.hasAttribute('data-maid-composer-hidden')).toBe(false)
-
-    // 宿主在上一次滚动事件之后才提交控件：此后再没有滚动事件可以依赖。
-    mountToBottomButton(scrollport)
-    await nextMicrotask()
     expect(seat.hasAttribute('data-maid-composer-hidden')).toBe(true)
 
-    // 回到尾部时控件被卸载，同样立即恢复。
-    scrollport.querySelector<HTMLElement>('button')!.remove()
+    const flow = scrollport.querySelector<HTMLElement>('[data-chat-flow]')!
+    flow.getBoundingClientRect = () => DOMRect.fromRect({ height: 290 })
+    resize(seat)
+    expect(seat.hasAttribute('data-maid-composer-hidden')).toBe(false)
+
+    flow.getBoundingClientRect = () => DOMRect.fromRect({ height: 325 })
+    resize(seat)
+    expect(seat.hasAttribute('data-maid-composer-hidden')).toBe(true)
+    flow.getBoundingClientRect = () => DOMRect.fromRect({ height: 310 })
+    resize(seat)
+    expect(seat.hasAttribute('data-maid-composer-hidden')).toBe(true)
+    dispose()
+    flow.getBoundingClientRect = () => DOMRect.fromRect({ height: 325 })
+    resize(seat)
     await nextMicrotask()
     expect(seat.hasAttribute('data-maid-composer-hidden')).toBe(false)
-    dispose()
   })
 
   it('releases the observer of a replaced conversation once the next one binds', () => {
-    const observed = new Map<Node, MutationObserver>()
-    const observe = vi.spyOn(MutationObserver.prototype, 'observe').mockImplementation(function (this: MutationObserver, target: Node) {
+    const observed = new Map<Element, FixtureResizeObserver>()
+    const observe = vi.spyOn(FixtureResizeObserver.prototype, 'observe').mockImplementation(function (this: FixtureResizeObserver, target: Element) {
       observed.set(target, this)
     })
-    const disconnect = vi.spyOn(MutationObserver.prototype, 'disconnect')
+    const disconnect = vi.spyOn(FixtureResizeObserver.prototype, 'disconnect')
     try {
       const first = mount('persistent', true)
       scrollTo(first.scrollport, 200)
@@ -341,10 +383,7 @@ describe('maid composer bottom-only', () => {
       const next = first.root.cloneNode(true) as HTMLElement
       document.body.append(next)
       const nextScrollport = next.querySelector<HTMLElement>('[data-conversation-scroll]')!
-      Object.defineProperties(nextScrollport, {
-        clientHeight: { configurable: true, value: SCROLLPORT_HEIGHT },
-        scrollHeight: { configurable: true, value: SCROLLPORT_CONTENT_HEIGHT },
-      })
+      defineGeometry(nextScrollport)
       scrollTo(nextScrollport, 200)
 
       expect(observed.get(nextScrollport)).toBeDefined()
@@ -356,14 +395,14 @@ describe('maid composer bottom-only', () => {
     }
   })
 
-  it('disconnects the transcript observers when bottom-only mode turns off', async () => {
-    const observed = new Map<Node, MutationObserver>()
-    const observe = vi.spyOn(MutationObserver.prototype, 'observe')
-    const disconnect = vi.spyOn(MutationObserver.prototype, 'disconnect')
+  it('disconnects the geometry observers when visibility modes turn off', async () => {
+    const observed = new Map<Element, FixtureResizeObserver>()
+    const observe = vi.spyOn(FixtureResizeObserver.prototype, 'observe')
+    const disconnect = vi.spyOn(FixtureResizeObserver.prototype, 'disconnect')
     try {
       const { scrollport, dispose } = mount('persistent', true)
       scrollTo(scrollport, 200)
-      observe.mock.calls.forEach(([target], i) => { observed.set(target, observe.mock.contexts[i] as MutationObserver) })
+      observe.mock.calls.forEach(([target], i) => { observed.set(target, observe.mock.contexts[i] as FixtureResizeObserver) })
       const transcriptObserver = observed.get(scrollport)
       expect(transcriptObserver).toBeDefined()
 
@@ -388,10 +427,7 @@ describe('maid composer bottom-only', () => {
     next.querySelector('[data-composer-seat]')!.removeAttribute('data-maid-composer-hidden')
     document.body.append(next)
     const nextScrollport = next.querySelector<HTMLElement>('[data-conversation-scroll]')!
-    Object.defineProperties(nextScrollport, {
-      clientHeight: { configurable: true, value: SCROLLPORT_HEIGHT },
-      scrollHeight: { configurable: true, value: SCROLLPORT_CONTENT_HEIGHT },
-    })
+    defineGeometry(nextScrollport)
     scrollTo(nextScrollport, 200)
 
     // Only a remembered seat is restored on dispose; the detached one was dropped.
