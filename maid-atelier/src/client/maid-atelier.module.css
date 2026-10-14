@@ -3860,10 +3860,10 @@ body[data-dsh-maid-atelier][data-ds-dark-theme]
   color: rgba(174, 189, 222, 0.5);
 }
 
-/* The alpha dock owns both statistics and ContextMeter, whose dialog portals
-   to body. Keep one backdrop layer on their shared surface. */
+/* Statistics and ContextMeter share one dock backdrop. Inline slot dialogs
+   own a separate reading surface, even when showModal() puts them in the top layer. */
 body[data-dsh-maid-atelier]
-  [data-composer-card] + div[class*='dock'] [data-slot='conversation.composer.dock'] > * {
+  [data-composer-card] + div[class*='dock'] [data-slot='conversation.composer.dock'] > *:not(dialog):not([role='dialog']) {
   background: transparent;
   backdrop-filter: none;
 }
