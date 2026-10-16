@@ -560,15 +560,16 @@ body[data-dsh-orca-link] [data-slot='settings.launcher'] button[data-collapsed][
   background: var(--dsw-input-solid);
 }
 
-/* Stats include noninteractive span pills as well as buttons. Their own
+/* Stats include noninteractive span pills as well as buttons (one row before
+   DSH 0.2.1, one [data-composer-stat] dock entry per pill after). Their own
    reading surface keeps small figures distinct from the scene behind them. */
-body[data-dsh-orca-link] [data-composer-stats] [class$='_pill'] {
+body[data-dsh-orca-link] :is([data-composer-stats], [data-composer-stat]) [class$='_pill'] {
   border-radius: 0 !important;
   background: var(--dsw-input-solid);
   color: var(--orca-graphite);
 }
 
-body[data-dsh-orca-link] [data-composer-stats] button[class$='_pill']:is(:hover, [aria-expanded='true']) {
+body[data-dsh-orca-link] :is([data-composer-stats], [data-composer-stat]) button[class$='_pill']:is(:hover, [aria-expanded='true']) {
   background: color-mix(in srgb, var(--orca-blue) 10%, var(--dsw-input-solid));
   color: var(--orca-ink);
 }

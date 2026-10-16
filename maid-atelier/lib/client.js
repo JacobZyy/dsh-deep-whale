@@ -374,7 +374,7 @@ window.__ModuleLoader__.load({
 		//#endregion
 		//#region src/client/composer-dismiss.ts
 		const SEAT_SELECTOR = "[data-composer-seat]";
-		const OPEN_PILL_SELECTOR = "[data-composer-stats] button[aria-expanded='true'][aria-haspopup='dialog']";
+		const OPEN_PILL_SELECTOR = ":is([data-composer-stats], [data-composer-stat]) button[aria-expanded='true'][aria-haspopup='dialog']";
 		const HIDING_ATTRIBUTES = ["data-maid-composer-hidden", "data-maid-composer-capsule"];
 		const installations$2 = /* @__PURE__ */ new WeakMap();
 		/**
