@@ -550,6 +550,15 @@ body[data-dsh-maid-atelier][data-maid-composer-motion]
   will-change: transform;
 }
 
+/* A retracted band still counts toward its column's scrollable overflow, and
+   the host column is `overflow: hidden`, so any scrollIntoView inside a page
+   (the plugin page after an install, for one) scrolled the whole column up by
+   the band's height and exposed the frame below. `clip` keeps the clipping
+   but makes the column no longer a scroll container. */
+body[data-dsh-maid-atelier] :has(> [data-skin-chrome='bottom-trim']) {
+  overflow: clip;
+}
+
 body[data-dsh-maid-atelier] [data-skin-chrome='bottom-trim']::after {
   content: '';
   position: absolute;
