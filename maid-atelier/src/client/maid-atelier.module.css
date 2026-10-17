@@ -3545,7 +3545,9 @@ body[data-dsh-maid-atelier] [data-phase='hero']
   [data-composer-card] [class*='trailing'] button[class*='trigger'] {
   width: auto;
   min-width: 0;
+  /* Same host cap as the active composer; see the model trigger rule. */
   max-width: 220px;
+  max-width: min(360px, 45cqw);
   height: 38px;
   padding: 0 4px 0 8px;
   border: 0;
