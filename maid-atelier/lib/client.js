@@ -470,6 +470,7 @@ window.__ModuleLoader__.load({
 		].join(",");
 		const TAIL_HIDE_THRESHOLD = 24;
 		const SEAT_GESTURE_WINDOW_MS = 200;
+		const KEYBOARD_SETTLE_MS = 800;
 		const ownershipByDocument = /* @__PURE__ */ new WeakMap();
 		function phaseRootOf(element) {
 			let candidate = element.closest("[data-phase]");
@@ -698,7 +699,7 @@ window.__ModuleLoader__.load({
 				if (!current()) return;
 				if (activeMode(doc) === null) return;
 				if (wheelTargetsSeatDraft(event)) {
-					seatGestureUntil = Date.now() + SEAT_GESTURE_WINDOW_MS;
+					seatGestureUntil = Math.max(seatGestureUntil, Date.now() + SEAT_GESTURE_WINDOW_MS);
 					return;
 				}
 				for (const candidate of event.composedPath()) {
@@ -710,12 +711,21 @@ window.__ModuleLoader__.load({
 					return;
 				}
 			};
+			const settleKeyboard = () => {
+				seatGestureUntil = Math.max(seatGestureUntil, Date.now() + KEYBOARD_SETTLE_MS);
+			};
 			const onFocusIn = (event) => {
 				if (!current()) return;
 				const target = event.target;
 				if (!(target instanceof Element)) return;
 				const seat = target.closest(COMPOSER_SEAT_SELECTOR);
-				if (seat !== null && phaseRootOf(seat)?.dataset.phase === "active") activateSeat(seat);
+				if (seat === null || phaseRootOf(seat)?.dataset.phase !== "active") return;
+				activateSeat(seat);
+				settleKeyboard();
+			};
+			const onViewportResize = () => {
+				if (!current() || activeMode(doc) === null) return;
+				if ((doc.activeElement?.closest(COMPOSER_SEAT_SELECTOR) ?? null) !== null) settleKeyboard();
 			};
 			const onFocusOut = (event) => {
 				const target = event.target;
@@ -764,6 +774,9 @@ window.__ModuleLoader__.load({
 			doc.addEventListener("wheel", onWheel, true);
 			doc.addEventListener("focusin", onFocusIn, true);
 			doc.addEventListener("focusout", onFocusOut, true);
+			const view = doc.defaultView;
+			view?.addEventListener("resize", onViewportResize);
+			view?.visualViewport?.addEventListener("resize", onViewportResize);
 			syncStructureObserver();
 			synchronizeGeometry();
 			return () => {
@@ -774,6 +787,8 @@ window.__ModuleLoader__.load({
 				doc.removeEventListener("wheel", onWheel, true);
 				doc.removeEventListener("focusin", onFocusIn, true);
 				doc.removeEventListener("focusout", onFocusOut, true);
+				view?.removeEventListener("resize", onViewportResize);
+				view?.visualViewport?.removeEventListener("resize", onViewportResize);
 				if (current()) {
 					clearSeatStates();
 					ownership.originals.clear();
