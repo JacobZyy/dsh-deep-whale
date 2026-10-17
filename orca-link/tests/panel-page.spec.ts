@@ -6,13 +6,9 @@ const css = readFileSync(
   'utf8',
 ).replace(/\r\n/g, '\n')
 
-// The `main` outlet renders the conversation inside the host's own
-// `main.conversation` slot, or a keyed panel page as its direct child. That
-// split is the one seat test every panel-page rule shares.
-// State the client projects from the `main` outlet; every panel-page rule is gated on it, so a
-// whole-subtree `*` rule is fast-rejected by the ancestor filter while no panel page is open.
+// Official panel selection gates page styles before matching their subtrees.
 const GATE = 'body[data-dsh-orca-link][data-orca-panel-page]'
-const PAGE = "[data-slot='main'] > :not([data-slot='main.conversation'])"
+const PAGE = "[data-slot='main'] > *"
 const COLUMN = "[class*='centerCol']"
 const escape = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 const block = (selector: string): string =>
@@ -57,7 +53,7 @@ describe('ORCA panel pages', () => {
     // ancestor compound names an attribute that is absent. Measured over six
     // right-panel toggles on a 4000-row page: 155ms ungated, 6.6ms gated.
     const ungated = css.match(
-      /^body\[data-dsh-orca-link\](?!\[data-orca-panel-page\])\s+\[data-slot='main'\] > :not\(\[data-slot='main\.conversation'\]\) \*/m,
+      /^body\[data-dsh-orca-link\](?!\[data-orca-panel-page\])\s+\[data-slot='main'\] > \* \*/m,
     )
     expect(ungated).toBeNull()
     const settings = css.match(/^body\[data-dsh-orca-link\](\[[^\]]+\])? :is\(\[data-slot='sidebar\.settings'\] \[role='dialog'\], \[role='dialog'\]\[data-shortcut-modal='settings'\]\) \*/gm) ?? []

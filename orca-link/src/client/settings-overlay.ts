@@ -14,10 +14,6 @@ const SETTINGS_IN_SIDEBAR_ATTRIBUTE = 'data-orca-settings-in-sidebar'
 const CORDIS_PANEL_SELECTOR = "[data-slot='sidebar.footer.action'] [data-cordis-panel]"
 const CORDIS_OPEN_ATTRIBUTE = 'data-orca-cordis-panel-open'
 const LAMP_ATTRIBUTE = 'data-orca-lamp'
-// The `main` outlet renders the conversation inside the host's own
-// `main.conversation` slot, or a keyed panel page as the outlet's direct child.
-const PANEL_PAGE_SELECTOR = "[data-slot='main'] > :not([data-slot='main.conversation'])"
-const PANEL_PAGE_ATTRIBUTE = 'data-orca-panel-page'
 // Tags the rc.2 settings portal's mask (a direct body child) so CSS matches it
 // by attribute instead of a `:has()` probe evaluated on every style pass.
 const SETTINGS_PORTAL_DIALOG_SELECTOR = "[role='dialog'][data-shortcut-modal='settings']"
@@ -29,7 +25,6 @@ export function installOrcaSettingsOverlay(body: HTMLElement): () => void {
   const originallyOpen = body.hasAttribute(SETTINGS_OPEN_ATTRIBUTE)
   const originallyInSidebar = body.hasAttribute(SETTINGS_IN_SIDEBAR_ATTRIBUTE)
   const originallyCordisOpen = body.hasAttribute(CORDIS_OPEN_ATTRIBUTE)
-  const originallyPanelPage = body.hasAttribute(PANEL_PAGE_ATTRIBUTE)
   let taggedOverlay: Element | null = null
   const originalLamp = body.getAttribute(LAMP_ATTRIBUTE)
   let lampTimer: ReturnType<typeof setTimeout> | undefined
@@ -66,10 +61,6 @@ export function installOrcaSettingsOverlay(body: HTMLElement): () => void {
     // body-level `:has()`-free rules driven by a JS-maintained flag instead of
     // letting Chromium re-evaluate a document-wide `:has()` on every mutation.
     body.toggleAttribute(CORDIS_OPEN_ATTRIBUTE, body.querySelector(CORDIS_PANEL_SELECTOR) !== null)
-    // Relational state the stylesheet used to probe with :has() arrives as
-    // attributes: a same-value write is still a mutation, so only write deltas.
-    const panelPage = body.querySelector(PANEL_PAGE_SELECTOR) !== null
-    if (body.hasAttribute(PANEL_PAGE_ATTRIBUTE) !== panelPage) body.toggleAttribute(PANEL_PAGE_ATTRIBUTE, panelPage)
     const portalMask = body.querySelector(SETTINGS_PORTAL_DIALOG_SELECTOR)?.parentElement ?? null
     const overlay = portalMask !== null && portalMask.parentElement === body
       && portalMask.getAttribute('role') === 'presentation'
@@ -98,7 +89,6 @@ export function installOrcaSettingsOverlay(body: HTMLElement): () => void {
     body.toggleAttribute(SETTINGS_OPEN_ATTRIBUTE, originallyOpen)
     body.toggleAttribute(SETTINGS_IN_SIDEBAR_ATTRIBUTE, originallyInSidebar)
     body.toggleAttribute(CORDIS_OPEN_ATTRIBUTE, originallyCordisOpen)
-    body.toggleAttribute(PANEL_PAGE_ATTRIBUTE, originallyPanelPage)
     taggedOverlay?.removeAttribute(SETTINGS_OVERLAY_ATTRIBUTE)
     taggedOverlay = null
     clearOrcaSidebarCarriers(body)

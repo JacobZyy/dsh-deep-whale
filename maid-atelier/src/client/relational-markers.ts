@@ -21,7 +21,6 @@ export function installMaidRelationalMarkers(ctx: Context): void {
       rules: [
         { selector: "button:has(> [data-slot='settings.trigger'])", attribute: 'data-maid-settings-trigger' },
         { selector: ":scope > :has(> [data-slot='settings.launcher'])", attribute: 'data-maid-settings-launcher-row' },
-        { selector: ":scope > :has(> :is(button[data-phase], [role='status']))", attribute: 'data-maid-settings-status-row' },
       ],
     },
   ])

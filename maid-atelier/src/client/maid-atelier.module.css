@@ -1210,13 +1210,14 @@ body[data-dsh-maid-atelier]
   z-index: 1;
   width: 100%;
   min-height: 50px;
-  padding-inline: 34px;
+  /* The painted frame and content share one inset; borders take no extra width. */
+  padding-inline: 2em;
   color: #f2dfba;
   border-style: solid;
-  border-width: 0 34px;
+  border-width: 0;
   border-image-source: var(--maid-settings-frame-art);
   border-image-slice: 0 220 0 220 fill;
-  border-image-width: 0 34px;
+  border-image-width: 0 2em;
   border-image-repeat: stretch;
   border-radius: 0;
   background: none;
@@ -1236,11 +1237,11 @@ body[data-dsh-maid-atelier]:not([data-maid-sidebar-size='rail'])
     [data-slot='sidebar.settings']
     button[aria-haspopup='dialog'][data-maid-settings-trigger] {
   position: relative;
-  flex: 1 1 auto;
-  width: 100%;
+  flex: 1 1 0;
+  width: auto;
   margin-inline: 0;
   justify-content: center;
-  gap: 8px;
+  gap: 0.5em;
 }
 
 body[data-dsh-maid-atelier]:not([data-maid-sidebar-size='rail'])
@@ -1249,22 +1250,6 @@ body[data-dsh-maid-atelier]:not([data-maid-sidebar-size='rail'])
     button[aria-haspopup='dialog'][data-maid-settings-trigger]
     [data-slot='settings.trigger'] {
   line-height: normal;
-}
-
-/* The wide settings row also owns the host connection state. Keep its
-   localized label visible, but cap the status pill so the framed settings
-   trigger retains a usable content box in narrow wide-mode sidebars. */
-body[data-dsh-maid-atelier]:not([data-maid-sidebar-size='rail'])
-    [data-maid-sidebar-footer]
-    [data-slot='sidebar.settings']
-    > [data-maid-settings-launcher-row][data-maid-settings-status-row]
-    > [data-slot='settings.launcher'] > button[aria-haspopup='dialog'][data-maid-settings-trigger] {
-  flex: 1 1 112px;
-  width: auto;
-  padding-inline: 8px;
-  border-width: 0 28px;
-  border-image-width: 0 28px;
-  gap: 4px;
 }
 
 body[data-dsh-maid-atelier]:not([data-maid-sidebar-size='rail'])
@@ -1799,9 +1784,9 @@ body[data-dsh-maid-atelier][data-maid-panel-page]
 /* The page root only lifts; it must not carry the filter. `z-index: 2` clears
    the stage (0), the sheet (1) and the trims (1), and the stacking context
    traps nothing because host overlays portal to body. */
-body[data-dsh-maid-atelier]
+body[data-dsh-maid-atelier][data-maid-panel-page]
   [data-slot='main']
-  > :not([data-slot='main.conversation']) {
+  > * {
   position: relative;
   z-index: 2;
 }
@@ -1810,9 +1795,9 @@ body[data-dsh-maid-atelier]
    opaque floor the skin gave up. On the sheet a 12px label lands near 2.6:1;
    a third more opacity keeps the state readable while still reading as
    disabled. `:where()` keeps the host and plugin rules able to outrank it. */
-body[data-dsh-maid-atelier]
+body[data-dsh-maid-atelier][data-maid-panel-page]
   [data-slot='main']
-  > :not([data-slot='main.conversation'])
+  > *
   :where(button, [role='button']):disabled {
   opacity: 0.55;
 }

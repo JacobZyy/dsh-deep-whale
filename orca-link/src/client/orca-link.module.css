@@ -352,15 +352,13 @@ body[data-dsh-orca-link] :where(span[data-state][aria-hidden='true']):not(
    a management surface with no high-churn content, and plugin pages draw
    their cards and rows from their own hard-coded radii (a 10px card no token
    reaches), so it takes the same whole-subtree rectilinear pass the settings
-   dialog already has. The `main` outlet renders either the conversation, which
-   the host wraps in its own `main.conversation` slot, or a keyed panel page as
-   the outlet's direct child; that split is the seat test every panel-page rule
-   below shares, and it needs no `:has()` scan of the transcript. */
+   dialog already has. Official panel selection gates these rules without
+   inspecting the conversation subtree. */
 body[data-dsh-orca-link] [data-tone],
-body[data-dsh-orca-link][data-orca-panel-page] [data-slot='main'] > :not([data-slot='main.conversation']),
-body[data-dsh-orca-link][data-orca-panel-page] [data-slot='main'] > :not([data-slot='main.conversation']) *,
-body[data-dsh-orca-link][data-orca-panel-page] [data-slot='main'] > :not([data-slot='main.conversation']) *::before,
-body[data-dsh-orca-link][data-orca-panel-page] [data-slot='main'] > :not([data-slot='main.conversation']) *::after {
+body[data-dsh-orca-link][data-orca-panel-page] [data-slot='main'] > *,
+body[data-dsh-orca-link][data-orca-panel-page] [data-slot='main'] > * *,
+body[data-dsh-orca-link][data-orca-panel-page] [data-slot='main'] > * *::before,
+body[data-dsh-orca-link][data-orca-panel-page] [data-slot='main'] > * *::after {
   border-radius: 0 !important;
 }
 
@@ -521,7 +519,7 @@ body[data-dsh-orca-link][data-orca-panel-page]
    cards take the skin's own surface instead of the 24% base wash, so a row
    still reads as a row on the sheet. Host overlays portal to body, so the new
    stacking context traps nothing. */
-body[data-dsh-orca-link][data-orca-panel-page] [data-slot='main'] > :not([data-slot='main.conversation']) {
+body[data-dsh-orca-link][data-orca-panel-page] [data-slot='main'] > * {
   position: relative;
   z-index: 2;
   --dsw-alias-bg-base: var(--orca-surface);
@@ -532,7 +530,7 @@ body[data-dsh-orca-link][data-orca-panel-page] [data-slot='main'] > :not([data-s
    a third more opacity keeps the state readable while still reading as
    disabled. `:where()` keeps host and plugin rules able to outrank it. */
 body[data-dsh-orca-link][data-orca-panel-page]
-  [data-slot='main'] > :not([data-slot='main.conversation'])
+  [data-slot='main'] > *
   :where(button, [role='button']):disabled {
   opacity: 0.55;
 }

@@ -4,7 +4,7 @@
  * independent layers. The sidebar keeps the product's native vector
  * wordmark; every skin-owned write is restored by the Cordis effect disposer.
  */
-import type { Context } from '@deepseek-ai/cordis'
+import { installPanelPageState, type PanelContext } from '../../../shared/panel-page-state.ts'
 import {
   MAID_ATELIER_BOW_CLEAN,
   MAID_ATELIER_CHIBI,
@@ -74,10 +74,6 @@ const ACTIVE_CONVERSATION_SELECTOR = "[data-phase='active']"
 const ACTIVE_CHAT_SELECTOR = `${ACTIVE_CONVERSATION_SELECTOR} [data-chat-flow]`
 const WORKSPACE_SELECTOR = "header [role='tablist']"
 const CORDIS_PANEL_SELECTOR = '[data-cordis-panel]'
-// The `main` outlet renders the conversation inside the host's own
-// `main.conversation` slot, or a keyed panel page (plugin manager, conversation
-// manager, ...) as the outlet's direct child.
-const PANEL_PAGE_SELECTOR = "[data-slot='main'] > :not([data-slot='main.conversation'])"
 // Tags the rc.2 settings portal's mask (a direct body child) so CSS can match it
 // by attribute instead of a `:has()` probe evaluated on every style pass.
 const SETTINGS_OVERLAY_ATTRIBUTE = 'data-maid-settings-overlay'
@@ -192,8 +188,6 @@ const PROJECTED_STATE_ATTRIBUTES = {
   // workarounds for that containment must not run against the rc.2 portal.
   settingsInSidebar: 'data-maid-settings-in-sidebar',
   workspace: 'data-maid-workspace',
-  // A keyed panel page (not the conversation) occupies the `main` outlet.
-  panelPage: 'data-maid-panel-page',
 } as const
 
 const PROJECTED_STATE_SELECTOR = [
@@ -509,12 +503,15 @@ function decorateWorkspaceTree(decoratedElements: Set<HTMLElement>): void {
   }
 }
 
+export const inject = ['layout']
+
 /**
  * Apply the skin-owned background and independently retractable chrome.
  * @param ctx - owning context whose effect retracts every DOM and CSS write.
  */
-export function apply(ctx: Context): void {
+export function apply(ctx: PanelContext): void {
   const body = document.body
+  installPanelPageState(ctx, body, 'data-maid-panel-page')
   installMaidRelationalMarkers(ctx)
   ctx.effect(() => installMaidCustomization(), 'ui-skin-maid-atelier: customization declaration')
   // The loader claims untagged <style> tags for whichever plugin loads last and
@@ -837,10 +834,6 @@ export function apply(ctx: Context): void {
     set(
       PROJECTED_STATE_ATTRIBUTES.settingsInSidebar,
       document.querySelector(SETTINGS_SLOT_DIALOG_SELECTOR) !== null,
-    )
-    set(
-      PROJECTED_STATE_ATTRIBUTES.panelPage,
-      document.querySelector(PANEL_PAGE_SELECTOR) !== null,
     )
     const portalMask = document.querySelector(SETTINGS_PORTAL_DIALOG_SELECTOR)?.parentElement ?? null
     const overlay = portalMask !== null && portalMask.parentElement === body

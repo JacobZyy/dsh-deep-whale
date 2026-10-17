@@ -103,10 +103,21 @@ const SETTINGS_CARRIER_FADE_RULE = CSS.match(
   /\[class\*='sidebarCol'\]\s*> div\s*> :not\([\s\S]*?\)\s*> \[data-maid-dialog-carrier\]\s*\{([^}]*)\}/s,
 )?.[1] ?? ''
 
+let activePanelId: string | null = null
+const panelListeners = new Set<() => void>()
+function selectPanel(id: string | null): void {
+  activePanelId = id
+  for (const listener of panelListeners) listener()
+}
 let fiber: Fiber | undefined
 
 async function mount(): Promise<Fiber> {
-  const f = new Context().plugin({ apply })
+  const ctx = new Context()
+  ctx.reflect.provide('layout', { panelInfo: {
+    getSnapshot: () => ({ activePanelId }),
+    subscribe: (listener: () => void) => { panelListeners.add(listener); return () => { panelListeners.delete(listener) } },
+  } })
+  const f = ctx.plugin({ apply })
   await f.await()
   return f
 }
@@ -119,6 +130,8 @@ async function flushMutations(): Promise<void> {
 afterEach(async () => {
   await fiber?.dispose()
   fiber = undefined
+  activePanelId = null
+  panelListeners.clear()
   vi.unstubAllGlobals()
   document.body.innerHTML = ''
   document.title = ''
@@ -207,7 +220,7 @@ describe('Maid Atelier skin apply', () => {
 
   it('declares only the public rc.6 client manifest', () => {
     const manifest = JSON.parse(readFileSync(resolve(process.cwd(), 'package.json'), 'utf8'))
-    expect(manifest.dsh.client).toEqual({ inject: [], platform: 'web' })
+    expect(manifest.dsh.client).toEqual({ inject: ['@deepseek-ai/dsh-client-ui-layout'], platform: 'web' })
     expect(manifest).not.toHaveProperty('dshClient')
     expect(manifest.peerDependencies).toHaveProperty('@deepseek-ai/cordis', '^4.0.1')
   })
@@ -376,12 +389,14 @@ describe('Maid Atelier skin apply', () => {
     const main = document.querySelector<HTMLElement>("[data-slot='main']")!
     expect(document.body.hasAttribute('data-maid-panel-page')).toBe(false)
 
-    // A keyed panel page is the outlet's direct child, beside no conversation slot.
+    // Official selection is authoritative, independently of the rendered tree.
     main.innerHTML = '<section data-plugin-panel></section>'
+    selectPanel('plugins')
     await flushMutations()
     expect(document.body.hasAttribute('data-maid-panel-page')).toBe(true)
 
     main.innerHTML = '<div data-slot="main.conversation" style="display: contents"><main data-phase="active"></main></div>'
+    selectPanel(null)
     await flushMutations()
     expect(document.body.hasAttribute('data-maid-panel-page')).toBe(false)
 
@@ -1185,9 +1200,6 @@ describe('Maid Atelier skin apply', () => {
     const centeredSettingsLabelRule = CSS.match(
       /\[data-slot='settings\.trigger'\]\s*\{([^}]*)\}/s,
     )?.[1] ?? ''
-    const constrainedSettingsRule = [...CSS.matchAll(
-      /button\[aria-haspopup='dialog'\]\[data-maid-settings-trigger\]\s*\{([^}]*)\}/g,
-    )].map(match => match[1] ?? '').find(rule => rule.includes('flex: 1 1 112px')) ?? ''
     const connectionRule = CSS.match(
       /> :is\(button\[data-phase\], \[role='status'\]\)\s*\{([^}]*)\}/s,
     )?.[1] ?? ''
@@ -1200,16 +1212,13 @@ describe('Maid Atelier skin apply', () => {
     // New Session button) and the pair stays centered, so resizing the sidebar
     // never stretches the space between the gear and the text.
     expect(centeredSettingsContentRule).toContain('position: relative')
-    expect(centeredSettingsContentRule).toContain('flex: 1 1 auto')
+    expect(centeredSettingsContentRule).toContain('flex: 1 1 0')
     expect(centeredSettingsContentRule).toContain('justify-content: center')
-    expect(centeredSettingsContentRule).toContain('gap: 8px')
+    expect(centeredSettingsContentRule).toContain('gap: 0.5em')
     expect(centeredSettingsLabelRule).not.toContain('position: absolute')
     expect(centeredSettingsLabelRule).not.toContain('left: 50%')
     expect(centeredSettingsLabelRule).toContain('line-height: normal')
-    expect(constrainedSettingsRule).toContain('width: auto')
-    expect(constrainedSettingsRule).toContain('padding-inline: 8px')
-    expect(constrainedSettingsRule).toContain('border-width: 0 28px')
-    expect(constrainedSettingsRule).toContain('gap: 4px')
+    expect(centeredSettingsContentRule).toContain('width: auto')
     expect(connectionRule).toContain('flex: 0 1 96px')
     expect(connectionRule).toContain('grid-template-columns: 14px minmax(0, 1fr)')
     expect(connectionRule).toContain('max-width: 96px')
@@ -2272,7 +2281,7 @@ describe('Maid Atelier skin apply', () => {
     expect(settingsRule).toContain('min-height: 50px')
     expect(settingsRule).toContain('border-image-source: var(--maid-settings-frame-art)')
     expect(settingsRule).toContain('border-image-slice: 0 220 0 220 fill')
-    expect(settingsRule).toContain('border-image-width: 0 34px')
+    expect(settingsRule).toContain('border-image-width: 0 2em')
   })
 
   it('lets the sidebar Workspace typography follow its own switch', () => {
