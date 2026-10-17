@@ -1,0 +1,66 @@
+name: Issue 等待反馈
+on:
+  issues:
+    types: [labeled]
+  issue_comment:
+    types: [created]
+  schedule:
+    - cron: '30 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+concurrency:
+  group: issue-feedback
+  cancel-in-progress: false
+
+jobs:
+  feedback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const label = 'awaiting-feedback'
+            const repo = context.repo
+            const payload = context.payload
+            if (payload.issue?.pull_request) return
+            if (context.eventName === 'issues' && payload.label?.name !== label) return
+            const issues = payload.issue ? [payload.issue] : await github.paginate(
+              github.rest.issues.listForRepo, { ...repo, state: 'open', labels: label, per_page: 100 })
+            for (const candidate of issues) {
+              if (candidate.pull_request) continue
+              const args = { ...repo, issue_number: candidate.number }
+              const { data: issue } = await github.rest.issues.get(args)
+              if (issue.state !== 'open' || !issue.labels.some(item => item.name === label)) continue
+              const events = await github.paginate(github.rest.issues.listEvents, { ...args, per_page: 100 })
+              const marked = events.filter(event => event.event === 'labeled' && event.label?.name === label)
+                .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0]
+              if (!marked) continue
+              const since = Date.parse(marked.created_at)
+              const comments = await github.paginate(github.rest.issues.listComments, { ...args, per_page: 100 })
+              if (comments.some(comment => comment.user?.id === issue.user.id && Date.parse(comment.created_at) >= since)) {
+                await github.rest.issues.removeLabel({ ...args, name: label })
+                continue
+              }
+              if (Date.now() - since >= 7 * 24 * 60 * 60 * 1000) {
+                // Re-read immediately before closing so a concurrent reply or unlabel cancels it.
+                const { data: fresh } = await github.rest.issues.get(args)
+                if (fresh.state !== 'open' || fresh.updated_at !== issue.updated_at) continue
+                await github.rest.issues.update({ ...args, state: 'closed', state_reason: 'not_planned' })
+                const afterClose = await github.paginate(github.rest.issues.listComments, { ...args, per_page: 100 })
+                if (afterClose.some(comment => comment.user?.id === issue.user.id && Date.parse(comment.created_at) >= since)) {
+                  await github.rest.issues.update({ ...args, state: 'open' })
+                  await github.rest.issues.removeLabel({ ...args, name: label })
+                  continue
+                }
+                await github.rest.issues.createComment({ ...args, body: '标记等待反馈后已满 7 天，尚未收到报告者回复，先关闭此 Issue。这不表示问题已修复；补充所需环境信息、复现步骤或性能记录后，可请求重新打开。' })
+              } else {
+                const marker = `<!-- awaiting-feedback:${marked.id} -->`
+                if (!comments.some(comment => comment.body?.includes(marker))) {
+                  await github.rest.issues.createComment({ ...args, body: `${marker}\n等待报告者补充维护者请求的信息。自本次标记起 7 天内未回复将自动关闭；报告者回复后移除等待标签，交回人工处理。请用评论补充信息，仅编辑正文不会取消等待。` })
+                }
+              }
+            }

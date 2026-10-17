@@ -6,7 +6,8 @@ body:
   - type: markdown
     attributes:
       value: |
-        请尽量填写完整，缺少环境信息的报告会被直接打回。
+        请填写实际运行环境，区分观察到的现象与推测的原因。维护者标记 awaiting-feedback 后，7 天未回复会关闭；补充信息后可继续处理。
+        桌面客户端名称包含 DSH 不代表由官方发行；请提供下载来源。无法确认的信息请明确写“不确定”，不要猜版本。
 
         > **先确认皮肤来源**：通过 dsh-web 皮肤工坊、skin-center 或 `@linxin666/dsh-web-all` 安装的皮肤
         > 是 dsh-web 维护的移植版（版本号通常为 0.3.x），与本仓库的独立插件不是同一产物，
@@ -32,12 +33,30 @@ body:
         - 不确定 / 其他
     validations:
       required: true
+  - type: dropdown
+    id: runtime-kind
+    attributes:
+      label: 运行方式
+      options:
+        - 官方 DSH Web（普通浏览器）
+        - 官方桌面客户端（请提供官方发行链接）
+        - 第三方桌面客户端 / 桌面壳
+        - 其他 / 不确定
+    validations:
+      required: true
+  - type: input
+    id: distribution
+    attributes:
+      label: 客户端来源与版本
+      description: 填写项目 / 下载链接和客户端完整版本；Web 用户填写官方安装来源。第三方桌面端如 anywhere-labs/dsh-desktop、DataElement Desktop 请写明。
+    validations:
+      required: true
   - type: input
     id: dsh-version
     attributes:
       label: DSH 版本
-      description: 运行 `dsh --version` 的输出
-      placeholder: 例如 0.1.0-rc.8
+      description: 填写实际运行宿主的完整版本及获取位置。Web 可提供 dsh --version；桌面端填写其内置 DSH 版本，不要用桌面壳版本或另一套全局 CLI 版本代替。
+      placeholder: 例如 0.2.0-rc.2（当前实例关于页）；无法获取请写不确定
     validations:
       required: true
   - type: dropdown
@@ -46,7 +65,7 @@ body:
       label: 皮肤来源 / 是否使用 dsh-web 生态链
       description: 工坊、skin-center 或 dsh-web-all 安装的皮肤请先到 https://github.com/zhu1090093659/dsh-web/issues 反馈，并在下方填写上游 issue 链接。
       options:
-        - 否，按本仓库 README / INSTALL 安装，直接运行 DSH
+        - 否，按本仓库 README / INSTALL 安装独立皮肤包
         - 是，但已在 dsh-web 反馈过（下方附链接）
         - 不确定
     validations:
@@ -63,8 +82,8 @@ body:
     id: skin-version
     attributes:
       label: 皮肤版本 / 提交
-      description: 皮肤安装方式与来源（link 路径 / git 提交号），不确定就写"最新"
-      placeholder: 例如 main 最新提交，或本地 link 路径
+      description: 填写准确包版本和安装来源；Git 安装提供提交 SHA，本地 link 提供路径与 SHA、是否有未提交修改。不要只填“最新”或分支名；无法确认请写不确定。
+      placeholder: npm 包名@版本，或 Git URL + 完整提交 SHA
     validations:
       required: true
   - type: dropdown
@@ -122,6 +141,18 @@ body:
     validations:
       required: true
   - type: textarea
+    id: baseline
+    attributes:
+      label: 官方最小环境对照
+      description: 同一官方 DSH 版本，仅保留官方默认插件、皮肤和必要管理器，启用 / 停用皮肤是否复现？第三方桌面用户请另用官方 Web 对照。未测试请明确写未测试，不要把第三方桌面停用皮肤当作官方对照。
+    validations:
+      required: true
+  - type: textarea
+    id: performance
+    attributes:
+      label: 性能记录（卡顿问题）
+      description: 卡顿请附启用 / 停用皮肤的 Performance 原始 trace（10–20 秒，可压缩），记录相同操作，注明 CPU、GPU、内存、硬件加速状态与会话长度。仅 CPU 百分比不能定位根因；非性能问题可留空。
+  - type: textarea
     id: screenshot
     attributes:
       label: 截图 / 录屏
@@ -142,6 +173,6 @@ body:
     id: plugins
     attributes:
       label: 已安装的其他插件
-      description: 皮肤与 dsh-better-sidebar / dsh-ui-appearance / dsh-tps 等同时使用时，请列出（很多问题来自插件组合）
+      description: 列出当前实例所有启用的社区插件及版本；没有则填无。不要只列出你认为与 UI 有关的插件。
     validations:
-      required: false
+      required: true
