@@ -205,9 +205,44 @@ describe('desktop icon sync', () => {
     const home = tempDir()
     const io = fakeIo(shortcuts(), ['C:\\Start\\DeepSeek Harness.lnk'])
     const sync = new DesktopIconSync(home, { execPath: EXE }, io)
-    expect(await sync.setEnabled(true, { skinId: 'maid-atelier', file: skinIcon() })).toEqual({ enabled: true, updated: 1, failed: 1 })
+    expect(await sync.setEnabled(true, { skinId: 'maid-atelier', file: skinIcon() })).toEqual({ enabled: true, updated: 1, failed: 1, errors: ['access denied'] })
     const state = JSON.parse(readFileSync(sync.statePath, 'utf8')) as { shortcuts: Record<string, unknown> }
     expect(Object.keys(state.shortcuts)).toEqual(['C:\\Desktop\\DeepSeek Harness.lnk'])
+  })
+
+  // #200: the write saved both shortcuts but reported failure, so no record
+  // reached the state file and turning the switch off used to skip the scan.
+  it('restores shortcuts whose write reported failure after saving', async () => {
+    const home = tempDir()
+    const io = fakeIo(shortcuts())
+    const write = io.write.bind(io)
+    io.write = async (changes) => (await write(changes)).map(result => ({ ...result, ok: false, error: 'invalid-output' }))
+    const sync = new DesktopIconSync(home, { execPath: EXE }, io)
+    expect(await sync.setEnabled(true, { skinId: 'orca-link', file: skinIcon('ORCA') })).toEqual({ enabled: true, updated: 0, failed: 2, errors: ['invalid-output'] })
+    expect((JSON.parse(readFileSync(sync.statePath, 'utf8')) as { shortcuts: object }).shortcuts).toEqual({})
+    expect(io.table.get('C:\\Desktop\\DeepSeek Harness.lnk')!.icon).not.toBe(EXE_ICON)
+
+    io.write = write
+    expect(await sync.setEnabled(false, null)).toEqual({ enabled: false, updated: 2, failed: 0 })
+    expect([...io.table.values()].map(shortcut => shortcut.icon)).toEqual([EXE_ICON, EXE_ICON, 'C:\\Other.exe,0'])
+    expect(readdirSync(sync.managedDir)).toEqual([])
+  })
+
+  it('heals a disabled state with no records on startup while a managed icon remains', async () => {
+    const home = tempDir()
+    const sync = new DesktopIconSync(home, { execPath: EXE }, fakeIo([]))
+    mkdirSync(sync.managedDir, { recursive: true })
+    const stale = join(sync.managedDir, 'orca-link-0123456789abcdef.ico')
+    writeFileSync(stale, 'ORCA')
+    writeFileSync(sync.statePath, JSON.stringify({ version: 1, enabled: false, shortcuts: {} }))
+    const io = fakeIo(shortcuts().map((shortcut, index) => index === 0 ? { ...shortcut, icon: `${stale},0` } : shortcut))
+    const healed = new DesktopIconSync(home, { execPath: EXE }, io)
+    expect(await healed.reconcile({ skinId: 'orca-link', file: skinIcon('ORCA') })).toEqual({ enabled: false, updated: 1, failed: 0 })
+    expect(io.table.get('C:\\Desktop\\DeepSeek Harness.lnk')!.icon).toBe(EXE_ICON)
+    expect(existsSync(stale)).toBe(false)
+    // Fully restored: later startups skip PowerShell again.
+    await healed.reconcile(null)
+    expect(io.writes).toHaveLength(1)
   })
 })
 

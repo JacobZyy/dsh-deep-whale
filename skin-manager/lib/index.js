@@ -37,7 +37,7 @@ function hashSkinAssets(hash, skinRoot) {
 	if (!existsSync(join(skinRoot, manifest))) return;
 	const text = readFileSync(join(skinRoot, manifest), "utf8").replaceAll("\r\n", "\n");
 	const files = JSON.parse(text);
-	if (!Array.isArray(files) || files.some((file) => typeof file !== "string" || !/^[a-f0-9]{64}\.(webp|png)$/.test(file))) throw new Error("Invalid skin artwork manifest");
+	if (!Array.isArray(files) || files.some((file) => typeof file !== "string" || !/^[a-f0-9]{64}\.(webp|png|ogg|wav|woff2)$/.test(file))) throw new Error("Invalid skin artwork manifest");
 	hash.update(`${manifest}\0${Buffer.byteLength(text)}\0`).update(text);
 	for (const file of [...new Set(files)].sort()) {
 		const input = `assets/runtime/${file}`;
@@ -991,7 +991,7 @@ function evaluateSkinCompatibility(manifest, runtimeVersion, exemptions) {
 */
 /** Largest ICO accepted from a skin manifest; real multi-size icons stay well below it. */
 const MAX_ICON_BYTES = 2097152;
-const POWERSHELL_TIMEOUT_MS = 2e4;
+const POWERSHELL_TIMEOUT_MS = 6e4;
 /** The Windows desktop host runs plugins in `DeepSeek Harness.exe` with ELECTRON_RUN_AS_NODE. */
 function detectDesktopShell(platform = process.platform, env = process.env, execPath = process.execPath) {
 	if (platform !== "win32" || env.ELECTRON_RUN_AS_NODE !== "1") return null;
@@ -1095,14 +1095,18 @@ var DesktopIconSync = class {
 	get enabled() {
 		return this.read().enabled;
 	}
-	/** Persist the switch, then apply (`source` set) or restore. */
+	/**
+	* Persist the switch, then apply (`source` set) or restore. An explicit
+	* toggle always scans, so a shortcut whose record never reached the state
+	* file (a write that reported failure after saving) is still put back.
+	*/
 	setEnabled(enabled, source) {
 		return this.serial(async () => {
 			this.write({
 				...this.read(),
 				enabled
 			});
-			return this.pass(enabled ? source : null);
+			return this.pass(enabled ? source : null, true);
 		});
 	}
 	/** Bring the shortcuts in line with the active skin; a no-op until the user opts in, except for leftovers. */
@@ -1114,11 +1118,11 @@ var DesktopIconSync = class {
 		this.queue = run.catch(() => void 0);
 		return run;
 	}
-	async pass(source) {
+	async pass(source, scan = false) {
 		const state = this.read();
 		const file = source === null ? null : this.install(source);
 		this.onIcon(file);
-		if (file === null && Object.keys(state.shortcuts).length === 0 && !existsSync(this.parkMarkerPath)) return {
+		if (!scan && file === null && Object.keys(state.shortcuts).length === 0 && !existsSync(this.parkMarkerPath) && !this.hasManagedIcons()) return {
 			enabled: state.enabled,
 			updated: 0,
 			failed: 0
@@ -1134,7 +1138,8 @@ var DesktopIconSync = class {
 			results = await this.io.write(plan.changes);
 			rmSync(this.parkMarkerPath, { force: true });
 		}
-		const failed = new Set(results.filter((result) => !result.ok).map((result) => pathKey(result.path)));
+		const failures = results.filter((result) => !result.ok);
+		const failed = new Set(failures.map((result) => pathKey(result.path)));
 		const next = {
 			...state,
 			shortcuts: { ...state.shortcuts }
@@ -1145,12 +1150,22 @@ var DesktopIconSync = class {
 			else next.shortcuts[path] = record;
 		}
 		this.write(next);
-		this.prune(desired, next);
+		const stranded = shortcuts.filter((shortcut) => failed.has(pathKey(shortcut.path)) && isManagedIcon(shortcut.icon, this.managedDir)).map((shortcut) => shortcut.icon);
+		this.prune(desired, next, stranded);
+		const errors = [...new Set(failures.map((result) => result.error ?? "unknown"))];
 		return {
 			enabled: state.enabled,
 			updated: results.length - failed.size,
-			failed: failed.size
+			failed: failed.size,
+			...errors.length > 0 ? { errors } : {}
 		};
+	}
+	hasManagedIcons() {
+		try {
+			return readdirSync(this.managedDir).some((file) => /\.ico$/i.test(file));
+		} catch {
+			return false;
+		}
 	}
 	/** Copy the ICO under a content-addressed name so the shortcut never points into a package. */
 	install(source) {
@@ -1166,8 +1181,8 @@ var DesktopIconSync = class {
 		return target;
 	}
 	/** Remove managed ICOs no shortcut record still refers to. */
-	prune(desired, state) {
-		const keep = new Set(Object.values(state.shortcuts).map((record) => pathKey(iconFile(record.applied))));
+	prune(desired, state, stranded = []) {
+		const keep = new Set([...Object.values(state.shortcuts).map((record) => record.applied), ...stranded].map((icon) => pathKey(iconFile(icon))));
 		if (desired !== null) keep.add(pathKey(iconFile(desired)));
 		let files;
 		try {
