@@ -4043,6 +4043,41 @@ body[data-dsh-maid-atelier][data-ds-dark-theme] [data-phase='active'] [data-comp
     inset 0 0 0 3px rgba(255, 255, 255, 0.05);
 }
 
+/* Permission glyphs climb one risk scale in the skin palette: navy reads,
+   gold writes inside the workspace, rose marks full access. Host icons carry
+   no mode marker, so match their stable path openings on the glyph's own
+   svg (the same keys ORCA uses); an unknown drawing keeps the native ink.
+   Only the glyph changes; the round trigger frame keeps its own colors. */
+body[data-dsh-maid-atelier] {
+  --maid-permission-read: #3d63b8;
+  --maid-permission-write: #b07f2c;
+  --maid-permission-full: #c4454f;
+}
+
+body[data-dsh-maid-atelier][data-ds-dark-theme] {
+  --maid-permission-read: #91b2f2;
+  --maid-permission-write: #e4c27a;
+  --maid-permission-full: #f2878b;
+}
+
+body[data-dsh-maid-atelier]
+  :is([data-maid-mode-trigger] > [class*='triggerIcon'], [role='menuitem'] > [class*='itemIcon'])
+  > svg:has(> path[d^='M5.08545 8.13775L7.18455']) {
+  color: var(--maid-permission-read);
+}
+
+body[data-dsh-maid-atelier]
+  :is([data-maid-mode-trigger] > [class*='triggerIcon'], [role='menuitem'] > [class*='itemIcon'])
+  > svg:has(> path[d^='M6.4209 1.68067C7.43922']) {
+  color: var(--maid-permission-write);
+}
+
+body[data-dsh-maid-atelier]
+  :is([data-maid-mode-trigger] > [class*='triggerIcon'], [role='menuitem'] > [class*='itemIcon'])
+  > svg:has(> path[d^='M8 4.39209V9.89209']) {
+  color: var(--maid-permission-full);
+}
+
 body[data-dsh-maid-atelier] [data-phase='active'] [data-composer-card] button[class*='primary'] {
   width: 38px;
   height: 38px;
