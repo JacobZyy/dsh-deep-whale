@@ -3736,29 +3736,28 @@ body[data-dsh-maid-atelier][data-maid-composer-motion='rise']
    marker instead of reserving compositor memory for the whole session. */
 body[data-dsh-maid-atelier][data-maid-composer-motion]
   [data-composer-card] {
-  will-change: transform, opacity;
+  will-change: transform;
 }
 
+/* Translate only: opacity < 1 (or will-change: opacity) makes the card a
+   backdrop root, so the plate's backdrop-filter would sample an empty card
+   and the frost would pop in only after the motion marker is released. */
 @keyframes maidAtelierComposerDock {
   from {
-    opacity: 0.94;
     transform: translateY(clamp(-240px, -26vh, -150px));
   }
 
   to {
-    opacity: 1;
     transform: none;
   }
 }
 
 @keyframes maidAtelierComposerRise {
   from {
-    opacity: 0.94;
     transform: translateY(clamp(150px, 26vh, 240px));
   }
 
   to {
-    opacity: 1;
     transform: none;
   }
 }
