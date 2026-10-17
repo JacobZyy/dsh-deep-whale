@@ -50,8 +50,14 @@ jobs:
                 const { data: fresh } = await github.rest.issues.get(args)
                 if (fresh.state !== 'open' || fresh.updated_at !== issue.updated_at) continue
                 await github.rest.issues.update({ ...args, state: 'closed', state_reason: 'not_planned' })
+                const afterClose = await github.paginate(github.rest.issues.listComments, { ...args, per_page: 100 })
+                if (afterClose.some(comment => comment.user?.id === issue.user.id && Date.parse(comment.created_at) >= since)) {
+                  await github.rest.issues.update({ ...args, state: 'open' })
+                  await github.rest.issues.removeLabel({ ...args, name: label })
+                  continue
+                }
                 await github.rest.issues.createComment({ ...args, body: '标记等待反馈后已满 7 天，尚未收到报告者回复，先关闭此 Issue。这不表示问题已修复；补充所需环境信息、复现步骤或性能记录后，可请求重新打开。' })
-              } else if (context.eventName === 'issues') {
+              } else {
                 const marker = `<!-- awaiting-feedback:${marked.id} -->`
                 if (!comments.some(comment => comment.body?.includes(marker))) {
                   await github.rest.issues.createComment({ ...args, body: `${marker}\n等待报告者补充维护者请求的信息。自本次标记起 7 天内未回复将自动关闭；报告者回复后移除等待标签，交回人工处理。请用评论补充信息，仅编辑正文不会取消等待。` })
