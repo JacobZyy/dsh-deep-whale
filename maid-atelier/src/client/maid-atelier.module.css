@@ -4901,7 +4901,10 @@ body[data-dsh-maid-atelier][data-ds-dark-theme]
    tool `data-variant` wrapper. Preserve their native full-width layout while
    giving a collapsed run header the same translucent wash as other tools. */
 body[data-dsh-maid-atelier]:not([data-ds-dark-theme])
-  [data-workflow-run] > :not([data-open='true']) > [data-disclosure-row] {
+  :is(
+    [data-workflow-run] > :not([data-open='true']),
+    [data-workflow-run] > :not([data-open='true']) > [data-disclosure-header]
+  ) > [data-disclosure-row] {
   background: linear-gradient(
     90deg,
     rgba(248, 250, 255, 0.32),
@@ -4912,7 +4915,10 @@ body[data-dsh-maid-atelier]:not([data-ds-dark-theme])
 }
 
 body[data-dsh-maid-atelier][data-ds-dark-theme]
-  [data-workflow-run] > :not([data-open='true']) > [data-disclosure-row] {
+  :is(
+    [data-workflow-run] > :not([data-open='true']),
+    [data-workflow-run] > :not([data-open='true']) > [data-disclosure-header]
+  ) > [data-disclosure-row] {
   background: linear-gradient(
     90deg,
     rgba(10, 20, 48, 0.58),
@@ -4970,12 +4976,18 @@ body[data-dsh-maid-atelier]
 }
 
 /* Collapsed rows have no expanded container, so each row blurs its own strip.
-   `:not([data-open='true'])` keeps the already-covered in-card header alone. */
+   `:not([data-open='true'])` keeps the already-covered in-card header alone.
+   DSH 0.2.1 nests the row in a [data-disclosure-header] flex row whose row
+   grows by default; `flex: 0 1 auto` keeps the strip at its content width.
+   Rules below list both the 0.2.0 and 0.2.1 parent paths. */
 body[data-dsh-maid-atelier]
   :is(
     [data-variant] > :not([data-open='true']),
-    [data-chat-flow-kind='context'] > [data-slot='conversation.chat.node'] > :not([data-open='true'])
+    [data-chat-flow-kind='context'] > [data-slot='conversation.chat.node'] > :not([data-open='true']),
+    [data-variant] > :not([data-open='true']) > [data-disclosure-header],
+    [data-chat-flow-kind='context'] > [data-slot='conversation.chat.node'] > :not([data-open='true']) > [data-disclosure-header]
   ) > [data-disclosure-row] {
+  flex: 0 1 auto;
   width: max-content;
   max-width: 100%;
   align-self: flex-start;
@@ -4989,8 +5001,10 @@ body[data-dsh-maid-atelier]
 body[data-dsh-maid-atelier]:not([data-ds-dark-theme]) :is(
   [data-variant='bash']:not(:has([data-disclosure-row])),
   [data-chat-flow-kind='system-prompt'] [data-disclosure-row],
-  [data-tool='present'] > :not([data-open='true']) > [data-disclosure-row]
+  [data-tool='present'] > :not([data-open='true']) > [data-disclosure-row],
+  [data-tool='present'] > :not([data-open='true']) > [data-disclosure-header] > [data-disclosure-row]
 ) {
+  flex: 0 1 auto;
   width: max-content;
   max-width: 100%;
   align-self: flex-start;
@@ -5007,8 +5021,10 @@ body[data-dsh-maid-atelier]:not([data-ds-dark-theme]) :is(
 body[data-dsh-maid-atelier][data-ds-dark-theme] :is(
   [data-variant='bash']:not(:has([data-disclosure-row])),
   [data-chat-flow-kind='system-prompt'] [data-disclosure-row],
-  [data-tool='present'] > :not([data-open='true']) > [data-disclosure-row]
+  [data-tool='present'] > :not([data-open='true']) > [data-disclosure-row],
+  [data-tool='present'] > :not([data-open='true']) > [data-disclosure-header] > [data-disclosure-row]
 ) {
+  flex: 0 1 auto;
   width: max-content;
   max-width: 100%;
   align-self: flex-start;
@@ -5059,7 +5075,10 @@ body[data-dsh-maid-atelier]:not([data-ds-dark-theme])
   :is(
     [data-variant]:not([data-variant='think']) > [data-open='true'],
     [data-chat-flow-kind='context'] > [data-slot='conversation.chat.node'] > [data-open='true'],
-    [data-workflow-run] > [data-open='true']
+    [data-workflow-run] > [data-open='true'],
+    [data-variant]:not([data-variant='think']) > [data-open='true'] > [data-disclosure-header],
+    [data-chat-flow-kind='context'] > [data-slot='conversation.chat.node'] > [data-open='true'] > [data-disclosure-header],
+    [data-workflow-run] > [data-open='true'] > [data-disclosure-header]
   ) > [data-disclosure-row] {
   background: transparent;
   backdrop-filter: none;
@@ -5069,15 +5088,22 @@ body[data-dsh-maid-atelier][data-ds-dark-theme]
   :is(
     [data-variant]:not([data-variant='think']) > [data-open='true'],
     [data-chat-flow-kind='context'] > [data-slot='conversation.chat.node'] > [data-open='true'],
-    [data-workflow-run] > [data-open='true']
+    [data-workflow-run] > [data-open='true'],
+    [data-variant]:not([data-variant='think']) > [data-open='true'] > [data-disclosure-header],
+    [data-chat-flow-kind='context'] > [data-slot='conversation.chat.node'] > [data-open='true'] > [data-disclosure-header],
+    [data-workflow-run] > [data-open='true'] > [data-disclosure-header]
   ) > [data-disclosure-row] {
   background: transparent;
   backdrop-filter: none;
 }
 
 body[data-dsh-maid-atelier]:not([data-ds-dark-theme])
-  [data-variant='think'] > [data-open='true'] > [data-disclosure-row] {
+  :is(
+    [data-variant='think'] > [data-open='true'],
+    [data-variant='think'] > [data-open='true'] > [data-disclosure-header]
+  ) > [data-disclosure-row] {
   display: inline-flex;
+  flex: 0 1 auto;
   width: max-content;
   max-width: 100%;
   align-self: flex-start;
@@ -5092,8 +5118,12 @@ body[data-dsh-maid-atelier]:not([data-ds-dark-theme])
 }
 
 body[data-dsh-maid-atelier][data-ds-dark-theme]
-  [data-variant='think'] > [data-open='true'] > [data-disclosure-row] {
+  :is(
+    [data-variant='think'] > [data-open='true'],
+    [data-variant='think'] > [data-open='true'] > [data-disclosure-header]
+  ) > [data-disclosure-row] {
   display: inline-flex;
+  flex: 0 1 auto;
   width: max-content;
   max-width: 100%;
   align-self: flex-start;
@@ -5112,9 +5142,11 @@ body[data-dsh-maid-atelier][data-ds-dark-theme]
    an 8% wash. Keep the sticky header strip above, and give the body an even
    porcelain pane with a stronger blur and a hairline edge. Border-box sizing
    keeps the padding inside max-width: a content-box pane was 24px wider than
-   its column and gave scrollable process groups a horizontal scrollbar. */
+   its column and gave scrollable process groups a horizontal scrollbar.
+   DSH 0.2.1 wraps the row in [data-disclosure-header], so the body follows
+   the header there and the row itself in 0.2.0. */
 body[data-dsh-maid-atelier]:not([data-ds-dark-theme])
-  [data-variant='think'] > [data-open='true'] > [data-disclosure-row] + * {
+  [data-variant='think'] > [data-open='true'] > :is([data-disclosure-row], [data-disclosure-header]) + * {
   display: inline-block;
   box-sizing: border-box;
   width: max-content;
@@ -5135,7 +5167,7 @@ body[data-dsh-maid-atelier]:not([data-ds-dark-theme])
 }
 
 body[data-dsh-maid-atelier][data-ds-dark-theme]
-  [data-variant='think'] > [data-open='true'] > [data-disclosure-row] + * {
+  [data-variant='think'] > [data-open='true'] > :is([data-disclosure-row], [data-disclosure-header]) + * {
   display: inline-block;
   box-sizing: border-box;
   width: max-content;
@@ -5232,7 +5264,7 @@ body[data-dsh-maid-atelier][data-ds-dark-theme]
 body[data-dsh-maid-atelier]
   [data-step-process-body]:not([hidden]):is([data-scroll-up], [data-scroll-down])
   :is(
-    [data-variant='think'] > [data-open='true'] > [data-disclosure-row] + *,
+    [data-variant='think'] > [data-open='true'] > :is([data-disclosure-row], [data-disclosure-header]) + *,
     [data-variant]:not([data-variant='think']) > [data-open='true'],
     [data-chat-flow-kind='context'] > [data-slot='conversation.chat.node'] > [data-open='true'],
     [data-workflow-run] > [data-open='true']
@@ -5402,7 +5434,11 @@ body[data-dsh-maid-atelier][data-ds-dark-theme] [data-changes-hover-preview] [da
   color: #e3e9f7;
 }
 
-body[data-dsh-maid-atelier] [data-tool='present'] > :not([data-open='true']) > [data-disclosure-row] {
+body[data-dsh-maid-atelier] :is(
+  [data-tool='present'] > :not([data-open='true']),
+  [data-tool='present'] > :not([data-open='true']) > [data-disclosure-header]
+) > [data-disclosure-row] {
+  flex: 0 1 auto;
   width: max-content;
   max-width: 100%;
   border-radius: 8px;
