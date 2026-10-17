@@ -4049,11 +4049,14 @@ body[data-dsh-maid-atelier] [data-phase='active'] [data-composer-card] button[cl
 }
 
 /* Model identity remains one control, but name and reasoning effort have
-   separate visual jobs: navy identifies the route, gold identifies compute. */
+   separate visual jobs: navy identifies the route, gold identifies compute.
+   Keep the host's row-relative cap: host decorations such as the 0.2.1 Flash
+   release tag widen the label, and a tighter cap ellipsizes the effort. */
 body[data-dsh-maid-atelier] [data-composer-card] [class*='trailing']
   button[aria-haspopup='menu'] {
   height: 32px;
-  max-width: min(240px, 38vw);
+  max-width: 240px;
+  max-width: min(360px, 45cqw);
   padding: 0 5px 0 8px;
   border-radius: 10px;
   color: #314979;
