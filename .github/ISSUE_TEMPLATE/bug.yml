@@ -36,19 +36,28 @@ body:
   - type: dropdown
     id: runtime-kind
     attributes:
-      label: 运行方式
+      label: 客户端发行版
+      description: |
+        多个第三方项目都叫“DSH Desktop / dsh-desktop”，且会修改官方插件，请按下载来源选择，不要按窗口标题猜：
+        - 官方桌面版：从 https://www.deepseek.com/harness/ 下载，程序名为“DeepSeek Harness”，版本号与 DSH 相同（如 0.2.0-rc.2）。
+        - anywhere-labs：github.com/anywhere-labs/dsh-desktop 或 dshdesktop.cn，桌面端版本为 2.x。
+        - dataelement：github.com/dataelement/dsh-desktop 或 dshdesktop.com，桌面端版本为 0.1x（如 0.12.0），菜单里有“连接手机…”。
+        仅在第三方客户端中复现的问题会先对照官方 DSH；第三方改动造成的冲突需到对应项目反馈。
       options:
-        - 官方 DSH Web（普通浏览器）
-        - 官方桌面客户端（请提供官方发行链接）
-        - 第三方桌面客户端 / 桌面壳
-        - 其他 / 不确定
+        - 官方 DSH Web（npx / dsh 命令启动，浏览器打开）
+        - 官方 DeepSeek Harness 桌面版（deepseek.com/harness）
+        - 第三方：anywhere-labs/dsh-desktop（dshdesktop.cn，2.x）
+        - 第三方：dataelement/dsh-desktop（dshdesktop.com，0.1x）
+        - 其他第三方客户端 / 桌面壳（下一项填链接）
+        - 不确定（下一项写下载来源）
     validations:
       required: true
   - type: input
     id: distribution
     attributes:
-      label: 客户端来源与版本
-      description: 填写项目 / 下载链接和客户端完整版本；Web 用户填写官方安装来源。第三方桌面端如 anywhere-labs/dsh-desktop、DataElement Desktop 请写明。
+      label: 客户端版本与下载来源
+      description: 填写客户端“关于”页中的完整版本与下载链接 / 仓库地址。第三方客户端请同时写桌面端版本和其内置 DSH 版本；从官方 Web 启动的写“官方 Web”。
+      placeholder: 例如 dataelement/dsh-desktop 0.12.0（https://github.com/dataelement/dsh-desktop/releases）
     validations:
       required: true
   - type: input
