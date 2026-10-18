@@ -918,9 +918,13 @@ window.__ModuleLoader__.load({
 			};
 			const onPointerDown = (event) => {
 				if (event.isPrimary === false || event.button > 0) return;
+				releaseSwallow();
 				const target = event.target;
 				if (!(target instanceof Element) || !dismissOutside(target)) return;
 				armSwallow();
+			};
+			const onPointerCancel = (event) => {
+				if (event.isPrimary !== false) releaseSwallow();
 			};
 			const onMouseDown = (event) => {
 				if (swallowTimer !== null) event.preventDefault();
@@ -948,10 +952,12 @@ window.__ModuleLoader__.load({
 				});
 			};
 			doc.addEventListener("pointerdown", onPointerDown, true);
+			doc.addEventListener("pointercancel", onPointerCancel, true);
 			doc.addEventListener("mousedown", onMouseDown, true);
 			doc.addEventListener("click", onClick, true);
 			return () => {
 				doc.removeEventListener("pointerdown", onPointerDown, true);
+				doc.removeEventListener("pointercancel", onPointerCancel, true);
 				doc.removeEventListener("mousedown", onMouseDown, true);
 				doc.removeEventListener("click", onClick, true);
 				if (pendingFrame !== null) view.cancelAnimationFrame(pendingFrame);
