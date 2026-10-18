@@ -91,8 +91,39 @@ export interface DesktopIconResult {
   updated: number
   /** Shortcuts the pass could not rewrite (for example an all-users shortcut without elevation). */
   failed: number
-  /** Distinct reasons PowerShell gave for the failed shortcuts, present only when some failed. */
+  /**
+   * Distinct reasons for the failed shortcuts, present only when some failed:
+   * a {@link ShortcutFailureCode} the panel explains, or PowerShell's message
+   * with shortcut paths removed.
+   */
   errors?: string[]
+}
+
+/**
+ * `shared-denied`: an all-users shortcut, which needs elevation.
+ * `save-blocked`: a per-user shortcut WScript.Shell could not save although
+ * the user owns it, which in practice is a security suite's shortcut
+ * protection blocking powershell.exe (#200, 360).
+ */
+export type ShortcutFailureCode = 'shared-denied' | 'save-blocked'
+
+/** Folders holding the all-users desktop and Start menu shortcuts. */
+export function sharedShortcutRoots(env: NodeJS.ProcessEnv = process.env): string[] {
+  const roots: string[] = []
+  if (env.PUBLIC) roots.push(joinPath(env.PUBLIC, 'Desktop'))
+  const programData = env.ProgramData ?? env.ALLUSERSPROFILE
+  if (programData) roots.push(joinPath(programData, 'Microsoft', 'Windows', 'Start Menu'))
+  return roots
+}
+
+/** Reduce one failed write to a reason shared by every shortcut it hit. */
+export function describeShortcutFailure(path: string, error: string | undefined, sharedRoots: string[]): string {
+  const key = pathKey(path)
+  if (sharedRoots.some(root => key.startsWith(`${pathKey(root)}\\`))) return 'shared-denied' satisfies ShortcutFailureCode
+  const message = (error ?? 'unknown').trim()
+  if (/unable to save shortcut|无法保存快捷方式/i.test(message)) return 'save-blocked' satisfies ShortcutFailureCode
+  // Drop quoted absolute paths so one cause hitting several shortcuts reads once.
+  return message.replace(/\s*(["'])[A-Za-z]:[\\/].*?\1/g, '').replace(/\s+/g, ' ').trim() || 'unknown'
 }
 
 const emptyState = (): DesktopIconState => ({ version: 1, enabled: false, shortcuts: {} })
@@ -251,7 +282,8 @@ export class DesktopIconSync {
     // file so the shortcut stays intact and the next pass still finds it.
     const stranded = shortcuts.filter(shortcut => failed.has(pathKey(shortcut.path)) && isManagedIcon(shortcut.icon, this.managedDir)).map(shortcut => shortcut.icon)
     this.prune(desired, next, stranded)
-    const errors = [...new Set(failures.map(result => result.error ?? 'unknown'))]
+    const sharedRoots = sharedShortcutRoots()
+    const errors = [...new Set(failures.map(result => describeShortcutFailure(result.path, result.error, sharedRoots)))]
     return { enabled: state.enabled, updated: results.length - failed.size, failed: failed.size, ...(errors.length > 0 ? { errors } : {}) }
   }
 

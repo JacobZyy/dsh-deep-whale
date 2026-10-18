@@ -998,6 +998,22 @@ function detectDesktopShell(platform = process.platform, env = process.env, exec
 	if (!/\.exe$/i.test(execPath) || /^node\.exe$/i.test(basename(execPath))) return null;
 	return { execPath };
 }
+/** Folders holding the all-users desktop and Start menu shortcuts. */
+function sharedShortcutRoots(env = process.env) {
+	const roots = [];
+	if (env.PUBLIC) roots.push(join(env.PUBLIC, "Desktop"));
+	const programData = env.ProgramData ?? env.ALLUSERSPROFILE;
+	if (programData) roots.push(join(programData, "Microsoft", "Windows", "Start Menu"));
+	return roots;
+}
+/** Reduce one failed write to a reason shared by every shortcut it hit. */
+function describeShortcutFailure(path, error, sharedRoots) {
+	const key = pathKey(path);
+	if (sharedRoots.some((root) => key.startsWith(`${pathKey(root)}\\`))) return "shared-denied";
+	const message = (error ?? "unknown").trim();
+	if (/unable to save shortcut|无法保存快捷方式/i.test(message)) return "save-blocked";
+	return message.replace(/\s*(["'])[A-Za-z]:[\\/].*?\1/g, "").replace(/\s+/g, " ").trim() || "unknown";
+}
 const emptyState = () => ({
 	version: 1,
 	enabled: false,
@@ -1152,7 +1168,8 @@ var DesktopIconSync = class {
 		this.write(next);
 		const stranded = shortcuts.filter((shortcut) => failed.has(pathKey(shortcut.path)) && isManagedIcon(shortcut.icon, this.managedDir)).map((shortcut) => shortcut.icon);
 		this.prune(desired, next, stranded);
-		const errors = [...new Set(failures.map((result) => result.error ?? "unknown"))];
+		const sharedRoots = sharedShortcutRoots();
+		const errors = [...new Set(failures.map((result) => describeShortcutFailure(result.path, result.error, sharedRoots)))];
 		return {
 			enabled: state.enabled,
 			updated: results.length - failed.size,

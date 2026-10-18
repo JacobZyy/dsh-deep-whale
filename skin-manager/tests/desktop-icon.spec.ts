@@ -4,11 +4,13 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { SkinCatalogEntry } from '../src/contract.ts'
 import {
+  describeShortcutFailure,
   detectDesktopShell,
   DesktopIconSync,
   isManagedIcon,
   planDesktopIcon,
   resolveSkinDesktopIcon,
+  sharedShortcutRoots,
   type ShortcutChange,
   type ShortcutInfo,
   type ShortcutIo,
@@ -210,6 +212,16 @@ describe('desktop icon sync', () => {
     expect(Object.keys(state.shortcuts)).toEqual(['C:\\Desktop\\DeepSeek Harness.lnk'])
   })
 
+  // #200: a security suite's shortcut protection blocks powershell.exe, and
+  // WScript.Shell names each shortcut in the same error.
+  it('reports one save-blocked reason for every blocked shortcut', async () => {
+    const home = tempDir()
+    const io = fakeIo(shortcuts())
+    io.write = async changes => changes.map(change => ({ path: change.path, ok: false, error: `Unable to save shortcut "${change.path}".` }))
+    const sync = new DesktopIconSync(home, { execPath: EXE }, io)
+    expect(await sync.setEnabled(true, { skinId: 'orca-link', file: skinIcon('ORCA') })).toEqual({ enabled: true, updated: 0, failed: 2, errors: ['save-blocked'] })
+  })
+
   // #200: the write saved both shortcuts but reported failure, so no record
   // reached the state file and turning the switch off used to skip the scan.
   it('restores shortcuts whose write reported failure after saving', async () => {
@@ -300,5 +312,34 @@ describe('desktop icon route', () => {
     expect((await call(route, 'POST', { action: 'desktop-icon', enabled: true })).body).toEqual({ ok: true, desktopIcon: { enabled: true, updated: 2, failed: 0 } })
     expect((await call(route, 'POST', { target: 'orca-link' })).body).toEqual({ ok: true, target: 'orca-link' })
     expect(followed).toEqual(['orca-link'])
+  })
+})
+
+describe('shortcut failure reasons', () => {
+  const roots = sharedShortcutRoots({ PUBLIC: 'C:\\Users\\Public', ProgramData: 'C:\\ProgramData' })
+  const own = 'C:\\Users\\me\\Desktop\\DeepSeek Harness.lnk'
+
+  it('lists the all-users desktop and Start menu', () => {
+    expect(roots).toEqual(['C:\\Users\\Public\\Desktop', 'C:\\ProgramData\\Microsoft\\Windows\\Start Menu'])
+  })
+
+  it('blames elevation only for all-users shortcuts', () => {
+    const shared = 'C:\\Users\\Public\\Desktop\\DeepSeek Harness.lnk'
+    expect(describeShortcutFailure(shared, `Unable to save shortcut "${shared}".`, roots)).toBe('shared-denied')
+    expect(describeShortcutFailure('c:\\programdata\\Microsoft\\Windows\\Start Menu\\Programs\\DeepSeek Harness.lnk', 'Access is denied.', roots)).toBe('shared-denied')
+    expect(describeShortcutFailure('C:\\Users\\PublicX\\Desktop\\DeepSeek Harness.lnk', 'boom', roots)).toBe('boom')
+  })
+
+  it('reads a per-user save failure as a security suite block', () => {
+    expect(describeShortcutFailure(own, `Unable to save shortcut "${own}".`, roots)).toBe('save-blocked')
+    expect(describeShortcutFailure(own, `无法保存快捷方式“${own}”。`, roots)).toBe('save-blocked')
+  })
+
+  it('strips shortcut paths from other messages so they deduplicate', () => {
+    const a = describeShortcutFailure('C:\\a.lnk', `Cannot find path 'C:\\a.lnk' because it does not exist.`, roots)
+    const b = describeShortcutFailure('C:\\b.lnk', `Cannot find path 'C:\\b.lnk' because it does not exist.`, roots)
+    expect(a).toBe('Cannot find path because it does not exist.')
+    expect(b).toBe(a)
+    expect(describeShortcutFailure(own, undefined, roots)).toBe('unknown')
   })
 })

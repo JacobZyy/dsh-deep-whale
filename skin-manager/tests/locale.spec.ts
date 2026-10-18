@@ -106,6 +106,15 @@ describe('manager copy tables', () => {
     expect(skinManagerCopy('zh').compatibility('1.2.3rc8')).toBe('已适配 DSH 1.2.3rc8')
     expect(skinManagerCopy('en').compatibility('1.2.3rc8')).toBe('Verified on DSH 1.2.3rc8')
   })
+
+  it('turns shortcut failure codes into advice and keeps the retry hint for raw messages', () => {
+    const zh = skinManagerCopy('zh').desktopIconDone
+    expect(zh(0, 2, ['save-blocked'])).toBe('已更新 0 个快捷方式，2 个修改失败：被安全软件（如 360、火绒）的快捷方式防护拦截，请把 DeepSeek Harness 加入其信任区后再切换一次开关。')
+    expect(zh(1, 1, ['shared-denied'])).toContain('管理员身份运行')
+    expect(zh(0, 1, ['boom'])).toBe('已更新 0 个快捷方式，1 个修改失败：boom；可再切换一次开关重试。')
+    expect(zh(0, 1)).toBe('已更新 0 个快捷方式，1 个修改失败：可再切换一次开关重试。')
+    expect(skinManagerCopy('en').desktopIconDone(0, 2, ['save-blocked'])).toContain('trusted list')
+  })
 })
 
 describe('skin-declared copy fallbacks', () => {
