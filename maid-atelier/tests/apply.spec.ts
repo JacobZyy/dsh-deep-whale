@@ -238,6 +238,10 @@ describe('Maid Atelier skin apply', () => {
       effect(factory: () => () => void): void {
         disposers.push(factory())
       },
+      layout: { panelInfo: {
+        getSnapshot: () => ({ activePanelId: null }),
+        subscribe: () => () => {},
+      } },
     } as unknown as Context
     const insertRule = vi.spyOn(CSSStyleSheet.prototype, 'insertRule')
       .mockImplementationOnce(() => {
@@ -1794,7 +1798,9 @@ describe('Maid Atelier skin apply', () => {
     expect(CSS).toContain('animation: maidAtelierComposerRise 520ms')
     expect(CSS).toContain('@keyframes maidAtelierComposerDock')
     expect(CSS).toContain('@keyframes maidAtelierComposerRise')
-    expect(CSS).toMatch(/\[data-maid-composer-motion\][^{]*\{[^}]*will-change: transform, opacity/s)
+    // Opacity would make the card a backdrop root and drop the plate's frost mid-motion.
+    expect(CSS).toMatch(/\[data-maid-composer-motion\][^{]*\[data-composer-card\]\s*\{\s*will-change: transform;\s*\}/s)
+    expect(CSS).not.toMatch(/@keyframes maidAtelierComposer(?:Dock|Rise)\s*\{[^@]*opacity/s)
   })
 
   it('styles assistant Markdown blocks through the stable flow-kind hook', () => {
