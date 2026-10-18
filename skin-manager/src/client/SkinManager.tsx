@@ -765,7 +765,7 @@ function DesktopIconCard({ initial }: { initial: DesktopIconStatus }) {
   const copy = skinManagerCopy(useUiLang())
   const [enabled, setEnabled] = useState(initial.enabled)
   const [pending, setPending] = useState(false)
-  const [outcome, setOutcome] = useState<{ updated: number, failed: number } | null>(null)
+  const [outcome, setOutcome] = useState<DesktopIconOutcome | null>(null)
   const [error, setError] = useState<string | null>(null)
   const live = useRef(true)
   useEffect(() => {
@@ -799,7 +799,7 @@ function DesktopIconCard({ initial }: { initial: DesktopIconStatus }) {
         onChange={toggle}
       />
       {pending && <p className={css.hint}>{copy.desktopIconPending}</p>}
-      {outcome !== null && <p className={outcome.failed > 0 ? css.error : css.hint}>{copy.desktopIconDone(outcome.updated, outcome.failed)}</p>}
+      {outcome !== null && <p className={outcome.failed > 0 ? css.error : css.hint}>{copy.desktopIconDone(outcome.updated, outcome.failed, outcome.errors)}</p>}
       {error !== null && <p className={css.error}>{copy.actionFailed(error)}</p>}
     </section>
   )
@@ -1000,15 +1000,23 @@ export async function fetchSkinCatalog(): Promise<SkinCatalogEntry[]> {
   return (await fetchSkinCatalogState()).skins
 }
 
+export interface DesktopIconOutcome {
+  enabled: boolean
+  updated: number
+  failed: number
+  /** Reasons PowerShell gave for the failed shortcuts. */
+  errors?: string[]
+}
+
 /** Turn the desktop shortcut icon sync on or off and report how many shortcuts changed. */
-export async function requestDesktopIcon(enabled: boolean): Promise<{ enabled: boolean, updated: number, failed: number }> {
+export async function requestDesktopIcon(enabled: boolean): Promise<DesktopIconOutcome> {
   const response = await fetch(SKIN_MANAGER_ROUTE, {
     method: 'POST',
     credentials: 'same-origin',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ action: 'desktop-icon', enabled }),
   })
-  const result = await response.json() as { ok?: boolean, desktopIcon?: { enabled: boolean, updated: number, failed: number }, error?: string }
+  const result = await response.json() as { ok?: boolean, desktopIcon?: DesktopIconOutcome, error?: string }
   if (!response.ok || result.ok !== true || result.desktopIcon === undefined) throw new Error(result.error ?? `HTTP ${response.status}`)
   return result.desktopIcon
 }

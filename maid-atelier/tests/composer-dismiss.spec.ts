@@ -15,7 +15,9 @@ interface Fixture {
   dispose: () => void
 }
 
-function mount(): Fixture {
+// DSH 0.2.0 renders one [data-composer-stats] row; 0.2.1 renders one
+// [data-composer-stat] dock entry per pill.
+function mount(layout: 'row' | 'entry' = 'row'): Fixture {
   const root = document.createElement('div')
   root.dataset.phase = 'active'
   const scrollport = document.createElement('div')
@@ -32,8 +34,9 @@ function mount(): Fixture {
   card.append(input)
   const dock = document.createElement('div')
   dock.dataset.slot = 'conversation.composer.dock'
-  const stats = document.createElement('div')
-  stats.dataset.composerStats = ''
+  const stats = document.createElement(layout === 'row' ? 'div' : 'span')
+  if (layout === 'row') stats.dataset.composerStats = ''
+  else stats.dataset.composerStat = 'activity'
   const pill = document.createElement('button')
   pill.type = 'button'
   pill.setAttribute('aria-haspopup', 'dialog')
@@ -53,7 +56,7 @@ function mount(): Fixture {
 }
 
 function pillClicks() {
-  return vi.spyOn(document.querySelector<HTMLButtonElement>('[data-composer-stats] button')!, 'click')
+  return vi.spyOn(document.querySelector<HTMLButtonElement>('[data-slot] button')!, 'click')
 }
 
 function nextMicrotask(): Promise<void> {
@@ -121,6 +124,18 @@ describe('maid composer hide/collapse dialog hand-off', () => {
     expect(spy).toHaveBeenCalledTimes(1)
     expect(pill.getAttribute('aria-expanded')).toBe('false')
     disposeCurrent()
+  })
+
+  it('dismisses an open pill rendered as a per-stat dock entry', async () => {
+    const { seat, pill, dispose } = mount('entry')
+    pill.setAttribute('aria-expanded', 'true')
+    const spy = pillClicks()
+
+    seat.setAttribute(HIDDEN, '')
+    await nextMicrotask()
+    expect(spy).toHaveBeenCalledTimes(1)
+    expect(pill.getAttribute('aria-expanded')).toBe('false')
+    dispose()
   })
 
   it('touches nothing while the composer stays visible', async () => {

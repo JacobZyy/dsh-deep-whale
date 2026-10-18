@@ -37,6 +37,11 @@ const TAIL_HIDE_THRESHOLD = 24
 // capped draft box reaches its own edge, so the transcript scroll that follows
 // the gesture is not a "scrolling back through history" intent.
 const SEAT_GESTURE_WINDOW_MS = 200
+// Focusing the composer on a phone raises the soft keyboard, which resizes the
+// viewport and lets the browser scroll the transcript to reveal the caret. That
+// scroll is not reading intent either; hiding on it would blur the composer and
+// drop the keyboard the reader just asked for.
+const KEYBOARD_SETTLE_MS = 800
 
 interface SeatSnapshot {
   hidden: string | null
@@ -307,7 +312,7 @@ export function installMaidComposerScroll(body: HTMLElement): () => void {
     if (mode === null) return
     // Inertia tails also belong to the draft, even with tiny wheel deltas.
     if (wheelTargetsSeatDraft(event)) {
-      seatGestureUntil = Date.now() + SEAT_GESTURE_WINDOW_MS
+      seatGestureUntil = Math.max(seatGestureUntil, Date.now() + SEAT_GESTURE_WINDOW_MS)
       return
     }
     for (const candidate of event.composedPath()) {
@@ -322,12 +327,24 @@ export function installMaidComposerScroll(body: HTMLElement): () => void {
     }
   }
 
+  const settleKeyboard = (): void => {
+    seatGestureUntil = Math.max(seatGestureUntil, Date.now() + KEYBOARD_SETTLE_MS)
+  }
+
   const onFocusIn = (event: FocusEvent): void => {
     if (!current()) return
     const target = event.target
     if (!(target instanceof Element)) return
     const seat = target.closest<HTMLElement>(COMPOSER_SEAT_SELECTOR)
-    if (seat !== null && phaseRootOf(seat)?.dataset.phase === 'active') activateSeat(seat)
+    if (seat === null || phaseRootOf(seat)?.dataset.phase !== 'active') return
+    activateSeat(seat)
+    settleKeyboard()
+  }
+
+  // The keyboard keeps resizing the viewport while it animates in and out.
+  const onViewportResize = (): void => {
+    if (!current() || activeMode(doc) === null) return
+    if ((doc.activeElement?.closest(COMPOSER_SEAT_SELECTOR) ?? null) !== null) settleKeyboard()
   }
 
   const onFocusOut = (event: FocusEvent): void => {
@@ -384,6 +401,9 @@ export function installMaidComposerScroll(body: HTMLElement): () => void {
   doc.addEventListener('wheel', onWheel, true)
   doc.addEventListener('focusin', onFocusIn, true)
   doc.addEventListener('focusout', onFocusOut, true)
+  const view = doc.defaultView
+  view?.addEventListener('resize', onViewportResize)
+  view?.visualViewport?.addEventListener('resize', onViewportResize)
   syncStructureObserver()
   synchronizeGeometry()
 
@@ -395,6 +415,8 @@ export function installMaidComposerScroll(body: HTMLElement): () => void {
     doc.removeEventListener('wheel', onWheel, true)
     doc.removeEventListener('focusin', onFocusIn, true)
     doc.removeEventListener('focusout', onFocusOut, true)
+    view?.removeEventListener('resize', onViewportResize)
+    view?.visualViewport?.removeEventListener('resize', onViewportResize)
     if (current()) {
       clearSeatStates()
       ownership.originals.clear()

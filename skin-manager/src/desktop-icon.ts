@@ -26,7 +26,9 @@ import { basename, dirname, isAbsolute, join as joinPath, relative as relativePa
 
 /** Largest ICO accepted from a skin manifest; real multi-size icons stay well below it. */
 const MAX_ICON_BYTES = 2 * 1024 * 1024
-const POWERSHELL_TIMEOUT_MS = 20_000
+// A write parks Start menu shortcuts for 3 s and compiles an Add-Type shim; on
+// a cold or busy machine that alone has been measured at 11-17 s.
+const POWERSHELL_TIMEOUT_MS = 60_000
 
 export interface DesktopShell {
   /** The desktop executable, which is also the Node binary of the host child. */
@@ -89,6 +91,39 @@ export interface DesktopIconResult {
   updated: number
   /** Shortcuts the pass could not rewrite (for example an all-users shortcut without elevation). */
   failed: number
+  /**
+   * Distinct reasons for the failed shortcuts, present only when some failed:
+   * a {@link ShortcutFailureCode} the panel explains, or PowerShell's message
+   * with shortcut paths removed.
+   */
+  errors?: string[]
+}
+
+/**
+ * `shared-denied`: an all-users shortcut, which needs elevation.
+ * `save-blocked`: a per-user shortcut WScript.Shell could not save although
+ * the user owns it, which in practice is a security suite's shortcut
+ * protection blocking powershell.exe (#200, 360).
+ */
+export type ShortcutFailureCode = 'shared-denied' | 'save-blocked'
+
+/** Folders holding the all-users desktop and Start menu shortcuts. */
+export function sharedShortcutRoots(env: NodeJS.ProcessEnv = process.env): string[] {
+  const roots: string[] = []
+  if (env.PUBLIC) roots.push(joinPath(env.PUBLIC, 'Desktop'))
+  const programData = env.ProgramData ?? env.ALLUSERSPROFILE
+  if (programData) roots.push(joinPath(programData, 'Microsoft', 'Windows', 'Start Menu'))
+  return roots
+}
+
+/** Reduce one failed write to a reason shared by every shortcut it hit. */
+export function describeShortcutFailure(path: string, error: string | undefined, sharedRoots: string[]): string {
+  const key = pathKey(path)
+  if (sharedRoots.some(root => key.startsWith(`${pathKey(root)}\\`))) return 'shared-denied' satisfies ShortcutFailureCode
+  const message = (error ?? 'unknown').trim()
+  if (/unable to save shortcut|无法保存快捷方式/i.test(message)) return 'save-blocked' satisfies ShortcutFailureCode
+  // Drop quoted absolute paths so one cause hitting several shortcuts reads once.
+  return message.replace(/\s*(["'])[A-Za-z]:[\\/].*?\1/g, '').replace(/\s+/g, ' ').trim() || 'unknown'
 }
 
 const emptyState = (): DesktopIconState => ({ version: 1, enabled: false, shortcuts: {} })
@@ -190,11 +225,15 @@ export class DesktopIconSync {
     return this.read().enabled
   }
 
-  /** Persist the switch, then apply (`source` set) or restore. */
+  /**
+   * Persist the switch, then apply (`source` set) or restore. An explicit
+   * toggle always scans, so a shortcut whose record never reached the state
+   * file (a write that reported failure after saving) is still put back.
+   */
   setEnabled(enabled: boolean, source: { skinId: string, file: string } | null): Promise<DesktopIconResult> {
     return this.serial(async () => {
       this.write({ ...this.read(), enabled })
-      return this.pass(enabled ? source : null)
+      return this.pass(enabled ? source : null, true)
     })
   }
 
@@ -209,13 +248,13 @@ export class DesktopIconSync {
     return run
   }
 
-  private async pass(source: { skinId: string, file: string } | null): Promise<DesktopIconResult> {
+  private async pass(source: { skinId: string, file: string } | null, scan = false): Promise<DesktopIconResult> {
     const state = this.read()
     const file = source === null ? null : this.install(source)
     this.onIcon(file)
-    // Nothing recorded, nothing wanted and no interrupted write to recover:
-    // skip the PowerShell round trip.
-    if (file === null && Object.keys(state.shortcuts).length === 0 && !existsSync(this.parkMarkerPath)) {
+    // Nothing recorded, nothing wanted, no interrupted write to recover and no
+    // managed ICO a shortcut could still show: skip the PowerShell round trip.
+    if (!scan && file === null && Object.keys(state.shortcuts).length === 0 && !existsSync(this.parkMarkerPath) && !this.hasManagedIcons()) {
       return { enabled: state.enabled, updated: 0, failed: 0 }
     }
     const desired = file === null ? null : `${file},0`
@@ -230,7 +269,8 @@ export class DesktopIconSync {
       results = await this.io.write(plan.changes)
       rmSync(this.parkMarkerPath, { force: true })
     }
-    const failed = new Set(results.filter(result => !result.ok).map(result => pathKey(result.path)))
+    const failures = results.filter(result => !result.ok)
+    const failed = new Set(failures.map(result => pathKey(result.path)))
     const next: DesktopIconState = { ...state, shortcuts: { ...state.shortcuts } }
     for (const [path, record] of Object.entries(plan.records)) {
       if (failed.has(pathKey(path))) continue
@@ -238,8 +278,21 @@ export class DesktopIconSync {
       else next.shortcuts[path] = record
     }
     this.write(next)
-    this.prune(desired, next)
-    return { enabled: state.enabled, updated: results.length - failed.size, failed: failed.size }
+    // A shortcut whose restore failed still shows its managed ICO; keep the
+    // file so the shortcut stays intact and the next pass still finds it.
+    const stranded = shortcuts.filter(shortcut => failed.has(pathKey(shortcut.path)) && isManagedIcon(shortcut.icon, this.managedDir)).map(shortcut => shortcut.icon)
+    this.prune(desired, next, stranded)
+    const sharedRoots = sharedShortcutRoots()
+    const errors = [...new Set(failures.map(result => describeShortcutFailure(result.path, result.error, sharedRoots)))]
+    return { enabled: state.enabled, updated: results.length - failed.size, failed: failed.size, ...(errors.length > 0 ? { errors } : {}) }
+  }
+
+  private hasManagedIcons(): boolean {
+    try {
+      return readdirSync(this.managedDir).some(file => /\.ico$/i.test(file))
+    } catch {
+      return false
+    }
   }
 
   /** Copy the ICO under a content-addressed name so the shortcut never points into a package. */
@@ -257,8 +310,8 @@ export class DesktopIconSync {
   }
 
   /** Remove managed ICOs no shortcut record still refers to. */
-  private prune(desired: string | null, state: DesktopIconState): void {
-    const keep = new Set(Object.values(state.shortcuts).map(record => pathKey(iconFile(record.applied))))
+  private prune(desired: string | null, state: DesktopIconState, stranded: string[] = []): void {
+    const keep = new Set([...Object.values(state.shortcuts).map(record => record.applied), ...stranded].map(icon => pathKey(iconFile(icon))))
     if (desired !== null) keep.add(pathKey(iconFile(desired)))
     let files: string[]
     try {

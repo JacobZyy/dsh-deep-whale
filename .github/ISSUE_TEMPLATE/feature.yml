@@ -7,6 +7,7 @@ body:
     attributes:
       value: |
         建议类 issue 请先说明动机与场景，便于判断优先级。
+        文字被遮挡、错位、显示异常等问题请改用 **Bug 报告** 模板，以便填写客户端发行版与版本。
   - type: dropdown
     id: skin
     attributes:

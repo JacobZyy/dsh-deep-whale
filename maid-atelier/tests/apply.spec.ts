@@ -103,10 +103,21 @@ const SETTINGS_CARRIER_FADE_RULE = CSS.match(
   /\[class\*='sidebarCol'\]\s*> div\s*> :not\([\s\S]*?\)\s*> \[data-maid-dialog-carrier\]\s*\{([^}]*)\}/s,
 )?.[1] ?? ''
 
+let activePanelId: string | null = null
+const panelListeners = new Set<() => void>()
+function selectPanel(id: string | null): void {
+  activePanelId = id
+  for (const listener of panelListeners) listener()
+}
 let fiber: Fiber | undefined
 
 async function mount(): Promise<Fiber> {
-  const f = new Context().plugin({ apply })
+  const ctx = new Context()
+  ctx.reflect.provide('layout', { panelInfo: {
+    getSnapshot: () => ({ activePanelId }),
+    subscribe: (listener: () => void) => { panelListeners.add(listener); return () => { panelListeners.delete(listener) } },
+  } })
+  const f = ctx.plugin({ apply })
   await f.await()
   return f
 }
@@ -119,6 +130,8 @@ async function flushMutations(): Promise<void> {
 afterEach(async () => {
   await fiber?.dispose()
   fiber = undefined
+  activePanelId = null
+  panelListeners.clear()
   vi.unstubAllGlobals()
   document.body.innerHTML = ''
   document.title = ''
@@ -207,7 +220,7 @@ describe('Maid Atelier skin apply', () => {
 
   it('declares only the public rc.6 client manifest', () => {
     const manifest = JSON.parse(readFileSync(resolve(process.cwd(), 'package.json'), 'utf8'))
-    expect(manifest.dsh.client).toEqual({ inject: [], platform: 'web' })
+    expect(manifest.dsh.client).toEqual({ inject: ['@deepseek-ai/dsh-client-ui-layout'], platform: 'web' })
     expect(manifest).not.toHaveProperty('dshClient')
     expect(manifest.peerDependencies).toHaveProperty('@deepseek-ai/cordis', '^4.0.1')
   })
@@ -225,6 +238,10 @@ describe('Maid Atelier skin apply', () => {
       effect(factory: () => () => void): void {
         disposers.push(factory())
       },
+      layout: { panelInfo: {
+        getSnapshot: () => ({ activePanelId: null }),
+        subscribe: () => () => {},
+      } },
     } as unknown as Context
     const insertRule = vi.spyOn(CSSStyleSheet.prototype, 'insertRule')
       .mockImplementationOnce(() => {
@@ -376,12 +393,14 @@ describe('Maid Atelier skin apply', () => {
     const main = document.querySelector<HTMLElement>("[data-slot='main']")!
     expect(document.body.hasAttribute('data-maid-panel-page')).toBe(false)
 
-    // A keyed panel page is the outlet's direct child, beside no conversation slot.
+    // Official selection is authoritative, independently of the rendered tree.
     main.innerHTML = '<section data-plugin-panel></section>'
+    selectPanel('plugins')
     await flushMutations()
     expect(document.body.hasAttribute('data-maid-panel-page')).toBe(true)
 
     main.innerHTML = '<div data-slot="main.conversation" style="display: contents"><main data-phase="active"></main></div>'
+    selectPanel(null)
     await flushMutations()
     expect(document.body.hasAttribute('data-maid-panel-page')).toBe(false)
 
@@ -1185,9 +1204,6 @@ describe('Maid Atelier skin apply', () => {
     const centeredSettingsLabelRule = CSS.match(
       /\[data-slot='settings\.trigger'\]\s*\{([^}]*)\}/s,
     )?.[1] ?? ''
-    const constrainedSettingsRule = [...CSS.matchAll(
-      /button\[aria-haspopup='dialog'\]\[data-maid-settings-trigger\]\s*\{([^}]*)\}/g,
-    )].map(match => match[1] ?? '').find(rule => rule.includes('flex: 1 1 112px')) ?? ''
     const connectionRule = CSS.match(
       /> :is\(button\[data-phase\], \[role='status'\]\)\s*\{([^}]*)\}/s,
     )?.[1] ?? ''
@@ -1200,16 +1216,13 @@ describe('Maid Atelier skin apply', () => {
     // New Session button) and the pair stays centered, so resizing the sidebar
     // never stretches the space between the gear and the text.
     expect(centeredSettingsContentRule).toContain('position: relative')
-    expect(centeredSettingsContentRule).toContain('flex: 1 1 auto')
+    expect(centeredSettingsContentRule).toContain('flex: 1 1 0')
     expect(centeredSettingsContentRule).toContain('justify-content: center')
-    expect(centeredSettingsContentRule).toContain('gap: 8px')
+    expect(centeredSettingsContentRule).toContain('gap: 0.5em')
     expect(centeredSettingsLabelRule).not.toContain('position: absolute')
     expect(centeredSettingsLabelRule).not.toContain('left: 50%')
     expect(centeredSettingsLabelRule).toContain('line-height: normal')
-    expect(constrainedSettingsRule).toContain('width: auto')
-    expect(constrainedSettingsRule).toContain('padding-inline: 8px')
-    expect(constrainedSettingsRule).toContain('border-width: 0 28px')
-    expect(constrainedSettingsRule).toContain('gap: 4px')
+    expect(centeredSettingsContentRule).toContain('width: auto')
     expect(connectionRule).toContain('flex: 0 1 96px')
     expect(connectionRule).toContain('grid-template-columns: 14px minmax(0, 1fr)')
     expect(connectionRule).toContain('max-width: 96px')
@@ -1785,7 +1798,9 @@ describe('Maid Atelier skin apply', () => {
     expect(CSS).toContain('animation: maidAtelierComposerRise 520ms')
     expect(CSS).toContain('@keyframes maidAtelierComposerDock')
     expect(CSS).toContain('@keyframes maidAtelierComposerRise')
-    expect(CSS).toMatch(/\[data-maid-composer-motion\][^{]*\{[^}]*will-change: transform, opacity/s)
+    // Opacity would make the card a backdrop root and drop the plate's frost mid-motion.
+    expect(CSS).toMatch(/\[data-maid-composer-motion\][^{]*\[data-composer-card\]\s*\{\s*will-change: transform;\s*\}/s)
+    expect(CSS).not.toMatch(/@keyframes maidAtelierComposer(?:Dock|Rise)\s*\{[^@]*opacity/s)
   })
 
   it('styles assistant Markdown blocks through the stable flow-kind hook', () => {
@@ -1917,7 +1932,7 @@ describe('Maid Atelier skin apply', () => {
     expect(CSS).toMatch(/:is\(\s*\[data-variant\](?::not\(\[data-variant='think'\]\))? > \[data-open='true'\],[\s\S]*?\)\s*\{[^}]*rgba\(248, 250, 255, 0\.5\)/)
     expect(CSS).not.toMatch(/\[data-variant\] > \[data-open='true'\][^{}]*backdrop-filter: blur\(3px\)/)
     expect(CSS).toMatch(/:is\([\s\S]*?\) > \[data-disclosure-row\]\s*\{[^}]*background: transparent[^}]*backdrop-filter: none/s)
-    expect(CSS).toMatch(/\[data-variant='think'\][^{]*\[data-disclosure-row\] \+ \*\s*\{[^}]*color: #34486f[^}]*line-height: 1\.65/s)
+    expect(CSS).toMatch(/\[data-variant='think'\][^{]*\[data-disclosure-header\]\) \+ \*\s*\{[^}]*color: #34486f[^}]*line-height: 1\.65/s)
     expect(CSS).toMatch(/\[data-ds-dark-theme\]\s+:is\(\[data-variant\], \[data-chat-flow-kind='context'\], \[data-tool='present'\]\)\s*\{[^}]*#d3ddf2[^}]*#b8c5e1/s)
     expect(CSS).toMatch(/\[data-ds-dark-theme\][\s\S]*?:is\(\[data-variant\], \[data-chat-flow-kind='context'\]\) \[data-disclosure-row\]\s*\{[^}]*rgba\(10, 20, 48, 0\.58\)/s)
     expect(CSS).toMatch(/\[data-ds-dark-theme\][\s\S]*?\[data-variant='think'\][^{]*\+ \*\s*\{[^}]*color: #c7d2e9/s)
@@ -1987,12 +2002,12 @@ describe('Maid Atelier skin apply', () => {
     const flatRule = CSS.match(
       /\[data-step-process-body\]:not\(\[hidden\]\):is\(\[data-scroll-up\], \[data-scroll-down\]\)\s*:is\(([^{]*)\)\s*\{([^}]*)\}/,
     )
-    expect(flatRule?.[1]).toContain("[data-variant='think'] > [data-open='true'] > [data-disclosure-row] + *")
+    expect(flatRule?.[1]).toContain("[data-variant='think'] > [data-open='true'] > :is([data-disclosure-row], [data-disclosure-header]) + *")
     expect(flatRule?.[1]).toContain("[data-variant]:not([data-variant='think']) > [data-open='true']")
     expect(flatRule?.[2]).toMatch(/background: transparent[^}]*box-shadow: none[^}]*backdrop-filter: none/s)
     // A padded max-content body must stay inside its column, or the process
     // group's scroll body grows a horizontal scrollbar.
-    const thinkBodies = [...CSS.matchAll(/\[data-variant='think'\] > \[data-open='true'\] > \[data-disclosure-row\] \+ \* \{([^}]*)\}/g)]
+    const thinkBodies = [...CSS.matchAll(/\[data-variant='think'\] > \[data-open='true'\] > :is\(\[data-disclosure-row\], \[data-disclosure-header\]\) \+ \* \{([^}]*)\}/g)]
     expect(thinkBodies).toHaveLength(2)
     for (const [, rule] of thinkBodies) {
       expect(rule).toContain('box-sizing: border-box')
@@ -2272,7 +2287,7 @@ describe('Maid Atelier skin apply', () => {
     expect(settingsRule).toContain('min-height: 50px')
     expect(settingsRule).toContain('border-image-source: var(--maid-settings-frame-art)')
     expect(settingsRule).toContain('border-image-slice: 0 220 0 220 fill')
-    expect(settingsRule).toContain('border-image-width: 0 34px')
+    expect(settingsRule).toContain('border-image-width: 0 2em')
   })
 
   it('lets the sidebar Workspace typography follow its own switch', () => {

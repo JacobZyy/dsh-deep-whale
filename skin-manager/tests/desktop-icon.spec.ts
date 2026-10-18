@@ -4,11 +4,13 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { SkinCatalogEntry } from '../src/contract.ts'
 import {
+  describeShortcutFailure,
   detectDesktopShell,
   DesktopIconSync,
   isManagedIcon,
   planDesktopIcon,
   resolveSkinDesktopIcon,
+  sharedShortcutRoots,
   type ShortcutChange,
   type ShortcutInfo,
   type ShortcutIo,
@@ -205,9 +207,54 @@ describe('desktop icon sync', () => {
     const home = tempDir()
     const io = fakeIo(shortcuts(), ['C:\\Start\\DeepSeek Harness.lnk'])
     const sync = new DesktopIconSync(home, { execPath: EXE }, io)
-    expect(await sync.setEnabled(true, { skinId: 'maid-atelier', file: skinIcon() })).toEqual({ enabled: true, updated: 1, failed: 1 })
+    expect(await sync.setEnabled(true, { skinId: 'maid-atelier', file: skinIcon() })).toEqual({ enabled: true, updated: 1, failed: 1, errors: ['access denied'] })
     const state = JSON.parse(readFileSync(sync.statePath, 'utf8')) as { shortcuts: Record<string, unknown> }
     expect(Object.keys(state.shortcuts)).toEqual(['C:\\Desktop\\DeepSeek Harness.lnk'])
+  })
+
+  // #200: a security suite's shortcut protection blocks powershell.exe, and
+  // WScript.Shell names each shortcut in the same error.
+  it('reports one save-blocked reason for every blocked shortcut', async () => {
+    const home = tempDir()
+    const io = fakeIo(shortcuts())
+    io.write = async changes => changes.map(change => ({ path: change.path, ok: false, error: `Unable to save shortcut "${change.path}".` }))
+    const sync = new DesktopIconSync(home, { execPath: EXE }, io)
+    expect(await sync.setEnabled(true, { skinId: 'orca-link', file: skinIcon('ORCA') })).toEqual({ enabled: true, updated: 0, failed: 2, errors: ['save-blocked'] })
+  })
+
+  // #200: the write saved both shortcuts but reported failure, so no record
+  // reached the state file and turning the switch off used to skip the scan.
+  it('restores shortcuts whose write reported failure after saving', async () => {
+    const home = tempDir()
+    const io = fakeIo(shortcuts())
+    const write = io.write.bind(io)
+    io.write = async (changes) => (await write(changes)).map(result => ({ ...result, ok: false, error: 'invalid-output' }))
+    const sync = new DesktopIconSync(home, { execPath: EXE }, io)
+    expect(await sync.setEnabled(true, { skinId: 'orca-link', file: skinIcon('ORCA') })).toEqual({ enabled: true, updated: 0, failed: 2, errors: ['invalid-output'] })
+    expect((JSON.parse(readFileSync(sync.statePath, 'utf8')) as { shortcuts: object }).shortcuts).toEqual({})
+    expect(io.table.get('C:\\Desktop\\DeepSeek Harness.lnk')!.icon).not.toBe(EXE_ICON)
+
+    io.write = write
+    expect(await sync.setEnabled(false, null)).toEqual({ enabled: false, updated: 2, failed: 0 })
+    expect([...io.table.values()].map(shortcut => shortcut.icon)).toEqual([EXE_ICON, EXE_ICON, 'C:\\Other.exe,0'])
+    expect(readdirSync(sync.managedDir)).toEqual([])
+  })
+
+  it('heals a disabled state with no records on startup while a managed icon remains', async () => {
+    const home = tempDir()
+    const sync = new DesktopIconSync(home, { execPath: EXE }, fakeIo([]))
+    mkdirSync(sync.managedDir, { recursive: true })
+    const stale = join(sync.managedDir, 'orca-link-0123456789abcdef.ico')
+    writeFileSync(stale, 'ORCA')
+    writeFileSync(sync.statePath, JSON.stringify({ version: 1, enabled: false, shortcuts: {} }))
+    const io = fakeIo(shortcuts().map((shortcut, index) => index === 0 ? { ...shortcut, icon: `${stale},0` } : shortcut))
+    const healed = new DesktopIconSync(home, { execPath: EXE }, io)
+    expect(await healed.reconcile({ skinId: 'orca-link', file: skinIcon('ORCA') })).toEqual({ enabled: false, updated: 1, failed: 0 })
+    expect(io.table.get('C:\\Desktop\\DeepSeek Harness.lnk')!.icon).toBe(EXE_ICON)
+    expect(existsSync(stale)).toBe(false)
+    // Fully restored: later startups skip PowerShell again.
+    await healed.reconcile(null)
+    expect(io.writes).toHaveLength(1)
   })
 })
 
@@ -265,5 +312,34 @@ describe('desktop icon route', () => {
     expect((await call(route, 'POST', { action: 'desktop-icon', enabled: true })).body).toEqual({ ok: true, desktopIcon: { enabled: true, updated: 2, failed: 0 } })
     expect((await call(route, 'POST', { target: 'orca-link' })).body).toEqual({ ok: true, target: 'orca-link' })
     expect(followed).toEqual(['orca-link'])
+  })
+})
+
+describe('shortcut failure reasons', () => {
+  const roots = sharedShortcutRoots({ PUBLIC: 'C:\\Users\\Public', ProgramData: 'C:\\ProgramData' })
+  const own = 'C:\\Users\\me\\Desktop\\DeepSeek Harness.lnk'
+
+  it('lists the all-users desktop and Start menu', () => {
+    expect(roots).toEqual(['C:\\Users\\Public\\Desktop', 'C:\\ProgramData\\Microsoft\\Windows\\Start Menu'])
+  })
+
+  it('blames elevation only for all-users shortcuts', () => {
+    const shared = 'C:\\Users\\Public\\Desktop\\DeepSeek Harness.lnk'
+    expect(describeShortcutFailure(shared, `Unable to save shortcut "${shared}".`, roots)).toBe('shared-denied')
+    expect(describeShortcutFailure('c:\\programdata\\Microsoft\\Windows\\Start Menu\\Programs\\DeepSeek Harness.lnk', 'Access is denied.', roots)).toBe('shared-denied')
+    expect(describeShortcutFailure('C:\\Users\\PublicX\\Desktop\\DeepSeek Harness.lnk', 'boom', roots)).toBe('boom')
+  })
+
+  it('reads a per-user save failure as a security suite block', () => {
+    expect(describeShortcutFailure(own, `Unable to save shortcut "${own}".`, roots)).toBe('save-blocked')
+    expect(describeShortcutFailure(own, `无法保存快捷方式“${own}”。`, roots)).toBe('save-blocked')
+  })
+
+  it('strips shortcut paths from other messages so they deduplicate', () => {
+    const a = describeShortcutFailure('C:\\a.lnk', `Cannot find path 'C:\\a.lnk' because it does not exist.`, roots)
+    const b = describeShortcutFailure('C:\\b.lnk', `Cannot find path 'C:\\b.lnk' because it does not exist.`, roots)
+    expect(a).toBe('Cannot find path because it does not exist.')
+    expect(b).toBe(a)
+    expect(describeShortcutFailure(own, undefined, roots)).toBe('unknown')
   })
 })

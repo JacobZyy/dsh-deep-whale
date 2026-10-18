@@ -1,5 +1,5 @@
 /** ORCA LINK presentation-only client skin. */
-import type { Context } from '@deepseek-ai/cordis'
+import { installPanelPageState, type PanelContext } from '../../../shared/panel-page-state.ts'
 import { installOrcaRelationalMarkers } from './relational-markers.ts'
 import { acquireSidebarState } from './sidebar-state.ts'
 import {
@@ -129,8 +129,11 @@ function syncSidebarWidth(body: HTMLElement, pane: Element, dragging: boolean, s
   return width
 }
 
-export function apply(ctx: Context): void {
+export const inject = ['layout']
+
+export function apply(ctx: PanelContext): void {
   const body = document.body
+  installPanelPageState(ctx, body, 'data-orca-panel-page')
   installOrcaRelationalMarkers(ctx)
   ctx.effect(() => installOrcaCustomization(), 'ui-skin-orca-link: customization declaration')
   // The loader claims untagged <style> tags for whichever plugin loads last and

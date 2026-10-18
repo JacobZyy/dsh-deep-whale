@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { Context } from '@deepseek-ai/cordis'
+import { installPanelPageState, type PanelContext } from '../../shared/panel-page-state.ts'
 import { afterEach, describe, expect, it } from 'vitest'
 import { installOrcaSettingsOverlay } from '../src/client/settings-overlay.ts'
 import { installOrcaWorkspaceMarks } from '../src/client/workspace-marks.ts'
@@ -8,28 +10,28 @@ const flush = async (): Promise<void> => { await Promise.resolve(); await Promis
 describe('ORCA relational state projected as attributes (no :has() probes)', () => {
   afterEach(() => { document.body.innerHTML = ''; for (const a of [...document.body.attributes]) document.body.removeAttribute(a.name) })
 
-  it('projects the keyed panel page from the main outlet', async () => {
-    document.body.innerHTML = `
-      <div data-slot="main" style="display: contents">
-        <div data-slot="main.conversation" style="display: contents"><main data-phase="hero"></main></div>
-      </div>
-    `
-    const dispose = installOrcaSettingsOverlay(document.body)
-    const main = document.querySelector<HTMLElement>("[data-slot='main']")!
+  it('projects the keyed panel page from official selection', async () => {
+    const ctx = new Context()
+    let activePanelId: string | null = null
+    const listeners = new Set<() => void>()
+    ctx.reflect.provide('layout', { panelInfo: {
+      getSnapshot: () => ({ activePanelId }),
+      subscribe: (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener) } },
+    } })
+    const fiber = ctx.plugin({ apply: (ctx: PanelContext) => installPanelPageState(ctx, document.body, 'data-orca-panel-page') })
+    await fiber.await()
     expect(document.body.hasAttribute('data-orca-panel-page')).toBe(false)
-
-    main.innerHTML = '<section data-plugin-panel></section>'
-    await flush()
+    activePanelId = 'plugins'
+    for (const listener of listeners) listener()
     expect(document.body.hasAttribute('data-orca-panel-page')).toBe(true)
-
-    main.innerHTML = '<div data-slot="main.conversation" style="display: contents"><main data-phase="active"></main></div>'
-    await flush()
+    activePanelId = null
+    for (const listener of listeners) listener()
     expect(document.body.hasAttribute('data-orca-panel-page')).toBe(false)
-
-    main.innerHTML = '<section data-plugin-panel></section>'
-    await flush()
-    dispose()
+    activePanelId = 'plugins'
+    for (const listener of listeners) listener()
+    await fiber.dispose()
     expect(document.body.hasAttribute('data-orca-panel-page')).toBe(false)
+    expect(listeners.size).toBe(0)
   })
 
   it('tags only the settings portal mask, and removes the tag with the dialog and on dispose', async () => {

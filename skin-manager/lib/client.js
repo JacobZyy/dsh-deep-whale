@@ -742,6 +742,14 @@ window.__ModuleLoader__.load({
 		function useUiLang() {
 			return (0, react.useSyncExternalStore)(subscribeUiLang, uiLangSnapshot, currentUiLang);
 		}
+		/**
+		* Explain the backend's shortcut failure reasons: known codes become advice,
+		* any other PowerShell message is shown as is and followed by the retry hint.
+		*/
+		function desktopIconReasons(errors, known, retry) {
+			const reasons = errors.map((error) => Object.hasOwn(known, error) ? known[error] : error);
+			return errors.every((error) => Object.hasOwn(known, error)) && errors.length > 0 ? reasons : [...reasons, retry];
+		}
 		const zhCopy = {
 			headerTitle: "皮肤管理",
 			increaseValue: (label) => `增大${label}`,
@@ -784,7 +792,10 @@ window.__ModuleLoader__.load({
 			desktopIconLabel: "桌面快捷方式跟随皮肤",
 			desktopIconDescription: "把桌面、开始菜单、任务栏和窗口缩略图上的 DeepSeek Harness 图标换成当前皮肤的图标；关闭或切回官方默认时还原。仅 Windows 桌面端，开始菜单会在几秒后刷新。",
 			desktopIconPending: "正在更新快捷方式…",
-			desktopIconDone: (updated, failed) => failed > 0 ? `已更新 ${updated} 个快捷方式，${failed} 个没有权限修改（例如所有用户共享的快捷方式）。` : updated > 0 ? `已更新 ${updated} 个快捷方式。` : "快捷方式已是目标图标，或当前皮肤未提供桌面图标。",
+			desktopIconDone: (updated, failed, errors = []) => failed > 0 ? `已更新 ${updated} 个快捷方式，${failed} 个修改失败：${desktopIconReasons(errors, {
+				"shared-denied": "所有用户共享的快捷方式需要以管理员身份运行 DeepSeek Harness",
+				"save-blocked": "被安全软件（如 360、火绒）的快捷方式防护拦截，请把 DeepSeek Harness 加入其信任区后再切换一次开关"
+			}, "可再切换一次开关重试").join("；")}。` : updated > 0 ? `已更新 ${updated} 个快捷方式。` : "快捷方式已是目标图标，或当前皮肤未提供桌面图标。",
 			schedulePolicy: "规则方式",
 			policyHideInRanges: "这些时段隐藏，其余时间显示",
 			policyShowInRanges: "这些时段显示，其余时间隐藏",
@@ -870,7 +881,10 @@ window.__ModuleLoader__.load({
 			desktopIconLabel: "Shortcut icon follows the skin",
 			desktopIconDescription: "Show the active skin's icon for DeepSeek Harness on the desktop, Start menu, taskbar and window thumbnail; turning this off or returning to the official look restores it. Windows desktop app only; the Start menu refreshes after a few seconds.",
 			desktopIconPending: "Updating shortcuts…",
-			desktopIconDone: (updated, failed) => failed > 0 ? `Updated ${updated} shortcut(s); ${failed} could not be changed without elevation (for example shortcuts shared by all users).` : updated > 0 ? `Updated ${updated} shortcut(s).` : "Shortcuts already show the target icon, or the active skin ships no desktop icon.",
+			desktopIconDone: (updated, failed, errors = []) => failed > 0 ? `Updated ${updated} shortcut(s); ${failed} could not be changed: ${desktopIconReasons(errors, {
+				"shared-denied": "shortcuts shared by all users need DeepSeek Harness to run as administrator",
+				"save-blocked": "a security suite's shortcut protection (such as 360 or Huorong) blocked the write; add DeepSeek Harness to its trusted list, then toggle the switch again"
+			}, "toggle the switch again to retry").join("; ")}.` : updated > 0 ? `Updated ${updated} shortcut(s).` : "Shortcuts already show the target icon, or the active skin ships no desktop icon.",
 			schedulePolicy: "Rule mode",
 			policyHideInRanges: "Hide during these periods, show otherwise",
 			policyShowInRanges: "Show during these periods, hide otherwise",
@@ -1921,7 +1935,7 @@ window.__ModuleLoader__.load({
 					}),
 					outcome !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
 						className: outcome.failed > 0 ? skin_manager_module_css_default.error : skin_manager_module_css_default.hint,
-						children: copy.desktopIconDone(outcome.updated, outcome.failed)
+						children: copy.desktopIconDone(outcome.updated, outcome.failed, outcome.errors)
 					}),
 					error !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
 						className: skin_manager_module_css_default.error,

@@ -1,7 +1,9 @@
 // Stats panels are portaled to body, so hiding their composer does not close
 // them. Toggle only its open stats trigger to let the host release the panel.
 const SEAT_SELECTOR = '[data-composer-seat]'
-const OPEN_PILL_SELECTOR = "[data-composer-stats] button[aria-expanded='true'][aria-haspopup='dialog']"
+// DSH 0.2.1 wraps each pill in its own [data-composer-stat] dock entry; earlier
+// hosts render one [data-composer-stats] row.
+const OPEN_PILL_SELECTOR = ":is([data-composer-stats], [data-composer-stat]) button[aria-expanded='true'][aria-haspopup='dialog']"
 const HIDING_ATTRIBUTES = [
   'data-maid-composer-hidden',
   'data-maid-composer-capsule',

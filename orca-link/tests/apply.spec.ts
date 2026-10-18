@@ -25,10 +25,17 @@ function hostIcon(component: string, attributes = ''): string {
 const CSS = readFileSync(resolve(process.cwd(), 'src/client/orca-link.module.css'), 'utf8')
 const TURN_MARK_SELECTOR = "[data-phase='active'] :has(+ * > * > [data-chat-flow]) > nav button[type='button'][aria-label]"
 
+let activePanelId: string | null = null
+const panelListeners = new Set<() => void>()
 let fiber: Fiber | undefined
 
 async function mount(): Promise<Fiber> {
-  const f = new Context().plugin({ apply })
+  const ctx = new Context()
+  ctx.reflect.provide('layout', { panelInfo: {
+    getSnapshot: () => ({ activePanelId }),
+    subscribe: (listener: () => void) => { panelListeners.add(listener); return () => { panelListeners.delete(listener) } },
+  } })
+  const f = ctx.plugin({ apply })
   await f.await()
   return f
 }
@@ -36,6 +43,8 @@ async function mount(): Promise<Fiber> {
 afterEach(async () => {
   await fiber?.dispose()
   fiber = undefined
+  activePanelId = null
+  panelListeners.clear()
   document.body.innerHTML = ''
   document.title = ''
   document.documentElement.lang = ''

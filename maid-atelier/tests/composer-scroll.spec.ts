@@ -199,6 +199,33 @@ describe('maid composer scroll-intent', () => {
     dispose()
   })
 
+  // #201: the soft keyboard a focus raises scrolls the transcript; reading that
+  // as an upward scroll hid and blurred the composer, dropping the keyboard.
+  it('a scroll the keyboard causes after focusing the composer neither hides nor blurs it', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(1_000_000)
+    try {
+      const { scrollport, seat, input, dispose } = mount()
+      scrollTo(scrollport, 400)
+      input.focus()
+      vi.advanceTimersByTime(300)
+      scrollTo(scrollport, 200)
+      // The keyboard is still animating: every viewport resize extends the window.
+      window.dispatchEvent(new Event('resize'))
+      vi.advanceTimersByTime(700)
+      scrollTo(scrollport, 150)
+      expect(seat.hasAttribute('data-maid-composer-hidden')).toBe(false)
+      expect(document.activeElement).toBe(input)
+
+      vi.advanceTimersByTime(900)
+      scrollTo(scrollport, 100) // the reader scrolls back through history
+      expect(seat.hasAttribute('data-maid-composer-hidden')).toBe(true)
+      dispose()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('ignores scrollports outside an active conversation root', () => {
     const { root, scrollport, seat, dispose } = mount()
     root.dataset.phase = 'hero'

@@ -550,6 +550,15 @@ body[data-dsh-maid-atelier][data-maid-composer-motion]
   will-change: transform;
 }
 
+/* A retracted band still counts toward its column's scrollable overflow, and
+   the host column is `overflow: hidden`, so any scrollIntoView inside a page
+   (the plugin page after an install, for one) scrolled the whole column up by
+   the band's height and exposed the frame below. `clip` keeps the clipping
+   but makes the column no longer a scroll container. */
+body[data-dsh-maid-atelier] :has(> [data-skin-chrome='bottom-trim']) {
+  overflow: clip;
+}
+
 body[data-dsh-maid-atelier] [data-skin-chrome='bottom-trim']::after {
   content: '';
   position: absolute;
@@ -1201,13 +1210,14 @@ body[data-dsh-maid-atelier]
   z-index: 1;
   width: 100%;
   min-height: 50px;
-  padding-inline: 34px;
+  /* The painted frame and content share one inset; borders take no extra width. */
+  padding-inline: 2em;
   color: #f2dfba;
   border-style: solid;
-  border-width: 0 34px;
+  border-width: 0;
   border-image-source: var(--maid-settings-frame-art);
   border-image-slice: 0 220 0 220 fill;
-  border-image-width: 0 34px;
+  border-image-width: 0 2em;
   border-image-repeat: stretch;
   border-radius: 0;
   background: none;
@@ -1227,11 +1237,11 @@ body[data-dsh-maid-atelier]:not([data-maid-sidebar-size='rail'])
     [data-slot='sidebar.settings']
     button[aria-haspopup='dialog'][data-maid-settings-trigger] {
   position: relative;
-  flex: 1 1 auto;
-  width: 100%;
+  flex: 1 1 0;
+  width: auto;
   margin-inline: 0;
   justify-content: center;
-  gap: 8px;
+  gap: 0.5em;
 }
 
 body[data-dsh-maid-atelier]:not([data-maid-sidebar-size='rail'])
@@ -1240,22 +1250,6 @@ body[data-dsh-maid-atelier]:not([data-maid-sidebar-size='rail'])
     button[aria-haspopup='dialog'][data-maid-settings-trigger]
     [data-slot='settings.trigger'] {
   line-height: normal;
-}
-
-/* The wide settings row also owns the host connection state. Keep its
-   localized label visible, but cap the status pill so the framed settings
-   trigger retains a usable content box in narrow wide-mode sidebars. */
-body[data-dsh-maid-atelier]:not([data-maid-sidebar-size='rail'])
-    [data-maid-sidebar-footer]
-    [data-slot='sidebar.settings']
-    > [data-maid-settings-launcher-row][data-maid-settings-status-row]
-    > [data-slot='settings.launcher'] > button[aria-haspopup='dialog'][data-maid-settings-trigger] {
-  flex: 1 1 112px;
-  width: auto;
-  padding-inline: 8px;
-  border-width: 0 28px;
-  border-image-width: 0 28px;
-  gap: 4px;
 }
 
 body[data-dsh-maid-atelier]:not([data-maid-sidebar-size='rail'])
@@ -1790,9 +1784,9 @@ body[data-dsh-maid-atelier][data-maid-panel-page]
 /* The page root only lifts; it must not carry the filter. `z-index: 2` clears
    the stage (0), the sheet (1) and the trims (1), and the stacking context
    traps nothing because host overlays portal to body. */
-body[data-dsh-maid-atelier]
+body[data-dsh-maid-atelier][data-maid-panel-page]
   [data-slot='main']
-  > :not([data-slot='main.conversation']) {
+  > * {
   position: relative;
   z-index: 2;
 }
@@ -1801,9 +1795,9 @@ body[data-dsh-maid-atelier]
    opaque floor the skin gave up. On the sheet a 12px label lands near 2.6:1;
    a third more opacity keeps the state readable while still reading as
    disabled. `:where()` keeps the host and plugin rules able to outrank it. */
-body[data-dsh-maid-atelier]
+body[data-dsh-maid-atelier][data-maid-panel-page]
   [data-slot='main']
-  > :not([data-slot='main.conversation'])
+  > *
   :where(button, [role='button']):disabled {
   opacity: 0.55;
 }
@@ -3536,7 +3530,9 @@ body[data-dsh-maid-atelier] [data-phase='hero']
   [data-composer-card] [class*='trailing'] button[class*='trigger'] {
   width: auto;
   min-width: 0;
+  /* Same host cap as the active composer; see the model trigger rule. */
   max-width: 220px;
+  max-width: min(360px, 45cqw);
   height: 38px;
   padding: 0 4px 0 8px;
   border: 0;
@@ -3727,29 +3723,28 @@ body[data-dsh-maid-atelier][data-maid-composer-motion='rise']
    marker instead of reserving compositor memory for the whole session. */
 body[data-dsh-maid-atelier][data-maid-composer-motion]
   [data-composer-card] {
-  will-change: transform, opacity;
+  will-change: transform;
 }
 
+/* Translate only: opacity < 1 (or will-change: opacity) makes the card a
+   backdrop root, so the plate's backdrop-filter would sample an empty card
+   and the frost would pop in only after the motion marker is released. */
 @keyframes maidAtelierComposerDock {
   from {
-    opacity: 0.94;
     transform: translateY(clamp(-240px, -26vh, -150px));
   }
 
   to {
-    opacity: 1;
     transform: none;
   }
 }
 
 @keyframes maidAtelierComposerRise {
   from {
-    opacity: 0.94;
     transform: translateY(clamp(150px, 26vh, 240px));
   }
 
   to {
-    opacity: 1;
     transform: none;
   }
 }
@@ -4033,6 +4028,41 @@ body[data-dsh-maid-atelier][data-ds-dark-theme] [data-phase='active'] [data-comp
     inset 0 0 0 3px rgba(255, 255, 255, 0.05);
 }
 
+/* Permission glyphs climb one risk scale in the skin palette: navy reads,
+   gold writes inside the workspace, rose marks full access. Host icons carry
+   no mode marker, so match their stable path openings on the glyph's own
+   svg (the same keys ORCA uses); an unknown drawing keeps the native ink.
+   Only the glyph changes; the round trigger frame keeps its own colors. */
+body[data-dsh-maid-atelier] {
+  --maid-permission-read: #3d63b8;
+  --maid-permission-write: #b07f2c;
+  --maid-permission-full: #c4454f;
+}
+
+body[data-dsh-maid-atelier][data-ds-dark-theme] {
+  --maid-permission-read: #91b2f2;
+  --maid-permission-write: #e4c27a;
+  --maid-permission-full: #f2878b;
+}
+
+body[data-dsh-maid-atelier]
+  :is([data-maid-mode-trigger] > [class*='triggerIcon'], [role='menuitem'] > [class*='itemIcon'])
+  > svg:has(> path[d^='M5.08545 8.13775L7.18455']) {
+  color: var(--maid-permission-read);
+}
+
+body[data-dsh-maid-atelier]
+  :is([data-maid-mode-trigger] > [class*='triggerIcon'], [role='menuitem'] > [class*='itemIcon'])
+  > svg:has(> path[d^='M6.4209 1.68067C7.43922']) {
+  color: var(--maid-permission-write);
+}
+
+body[data-dsh-maid-atelier]
+  :is([data-maid-mode-trigger] > [class*='triggerIcon'], [role='menuitem'] > [class*='itemIcon'])
+  > svg:has(> path[d^='M8 4.39209V9.89209']) {
+  color: var(--maid-permission-full);
+}
+
 body[data-dsh-maid-atelier] [data-phase='active'] [data-composer-card] button[class*='primary'] {
   width: 38px;
   height: 38px;
@@ -4040,11 +4070,14 @@ body[data-dsh-maid-atelier] [data-phase='active'] [data-composer-card] button[cl
 }
 
 /* Model identity remains one control, but name and reasoning effort have
-   separate visual jobs: navy identifies the route, gold identifies compute. */
+   separate visual jobs: navy identifies the route, gold identifies compute.
+   Keep the host's row-relative cap: host decorations such as the 0.2.1 Flash
+   release tag widen the label, and a tighter cap ellipsizes the effort. */
 body[data-dsh-maid-atelier] [data-composer-card] [class*='trailing']
   button[aria-haspopup='menu'] {
   height: 32px;
-  max-width: min(240px, 38vw);
+  max-width: 240px;
+  max-width: min(360px, 45cqw);
   padding: 0 5px 0 8px;
   border-radius: 10px;
   color: #314979;
@@ -4901,7 +4934,10 @@ body[data-dsh-maid-atelier][data-ds-dark-theme]
    tool `data-variant` wrapper. Preserve their native full-width layout while
    giving a collapsed run header the same translucent wash as other tools. */
 body[data-dsh-maid-atelier]:not([data-ds-dark-theme])
-  [data-workflow-run] > :not([data-open='true']) > [data-disclosure-row] {
+  :is(
+    [data-workflow-run] > :not([data-open='true']),
+    [data-workflow-run] > :not([data-open='true']) > [data-disclosure-header]
+  ) > [data-disclosure-row] {
   background: linear-gradient(
     90deg,
     rgba(248, 250, 255, 0.32),
@@ -4912,7 +4948,10 @@ body[data-dsh-maid-atelier]:not([data-ds-dark-theme])
 }
 
 body[data-dsh-maid-atelier][data-ds-dark-theme]
-  [data-workflow-run] > :not([data-open='true']) > [data-disclosure-row] {
+  :is(
+    [data-workflow-run] > :not([data-open='true']),
+    [data-workflow-run] > :not([data-open='true']) > [data-disclosure-header]
+  ) > [data-disclosure-row] {
   background: linear-gradient(
     90deg,
     rgba(10, 20, 48, 0.58),
@@ -4970,12 +5009,18 @@ body[data-dsh-maid-atelier]
 }
 
 /* Collapsed rows have no expanded container, so each row blurs its own strip.
-   `:not([data-open='true'])` keeps the already-covered in-card header alone. */
+   `:not([data-open='true'])` keeps the already-covered in-card header alone.
+   DSH 0.2.1 nests the row in a [data-disclosure-header] flex row whose row
+   grows by default; `flex: 0 1 auto` keeps the strip at its content width.
+   Rules below list both the 0.2.0 and 0.2.1 parent paths. */
 body[data-dsh-maid-atelier]
   :is(
     [data-variant] > :not([data-open='true']),
-    [data-chat-flow-kind='context'] > [data-slot='conversation.chat.node'] > :not([data-open='true'])
+    [data-chat-flow-kind='context'] > [data-slot='conversation.chat.node'] > :not([data-open='true']),
+    [data-variant] > :not([data-open='true']) > [data-disclosure-header],
+    [data-chat-flow-kind='context'] > [data-slot='conversation.chat.node'] > :not([data-open='true']) > [data-disclosure-header]
   ) > [data-disclosure-row] {
+  flex: 0 1 auto;
   width: max-content;
   max-width: 100%;
   align-self: flex-start;
@@ -4989,8 +5034,10 @@ body[data-dsh-maid-atelier]
 body[data-dsh-maid-atelier]:not([data-ds-dark-theme]) :is(
   [data-variant='bash']:not(:has([data-disclosure-row])),
   [data-chat-flow-kind='system-prompt'] [data-disclosure-row],
-  [data-tool='present'] > :not([data-open='true']) > [data-disclosure-row]
+  [data-tool='present'] > :not([data-open='true']) > [data-disclosure-row],
+  [data-tool='present'] > :not([data-open='true']) > [data-disclosure-header] > [data-disclosure-row]
 ) {
+  flex: 0 1 auto;
   width: max-content;
   max-width: 100%;
   align-self: flex-start;
@@ -5007,8 +5054,10 @@ body[data-dsh-maid-atelier]:not([data-ds-dark-theme]) :is(
 body[data-dsh-maid-atelier][data-ds-dark-theme] :is(
   [data-variant='bash']:not(:has([data-disclosure-row])),
   [data-chat-flow-kind='system-prompt'] [data-disclosure-row],
-  [data-tool='present'] > :not([data-open='true']) > [data-disclosure-row]
+  [data-tool='present'] > :not([data-open='true']) > [data-disclosure-row],
+  [data-tool='present'] > :not([data-open='true']) > [data-disclosure-header] > [data-disclosure-row]
 ) {
+  flex: 0 1 auto;
   width: max-content;
   max-width: 100%;
   align-self: flex-start;
@@ -5059,7 +5108,10 @@ body[data-dsh-maid-atelier]:not([data-ds-dark-theme])
   :is(
     [data-variant]:not([data-variant='think']) > [data-open='true'],
     [data-chat-flow-kind='context'] > [data-slot='conversation.chat.node'] > [data-open='true'],
-    [data-workflow-run] > [data-open='true']
+    [data-workflow-run] > [data-open='true'],
+    [data-variant]:not([data-variant='think']) > [data-open='true'] > [data-disclosure-header],
+    [data-chat-flow-kind='context'] > [data-slot='conversation.chat.node'] > [data-open='true'] > [data-disclosure-header],
+    [data-workflow-run] > [data-open='true'] > [data-disclosure-header]
   ) > [data-disclosure-row] {
   background: transparent;
   backdrop-filter: none;
@@ -5069,15 +5121,22 @@ body[data-dsh-maid-atelier][data-ds-dark-theme]
   :is(
     [data-variant]:not([data-variant='think']) > [data-open='true'],
     [data-chat-flow-kind='context'] > [data-slot='conversation.chat.node'] > [data-open='true'],
-    [data-workflow-run] > [data-open='true']
+    [data-workflow-run] > [data-open='true'],
+    [data-variant]:not([data-variant='think']) > [data-open='true'] > [data-disclosure-header],
+    [data-chat-flow-kind='context'] > [data-slot='conversation.chat.node'] > [data-open='true'] > [data-disclosure-header],
+    [data-workflow-run] > [data-open='true'] > [data-disclosure-header]
   ) > [data-disclosure-row] {
   background: transparent;
   backdrop-filter: none;
 }
 
 body[data-dsh-maid-atelier]:not([data-ds-dark-theme])
-  [data-variant='think'] > [data-open='true'] > [data-disclosure-row] {
+  :is(
+    [data-variant='think'] > [data-open='true'],
+    [data-variant='think'] > [data-open='true'] > [data-disclosure-header]
+  ) > [data-disclosure-row] {
   display: inline-flex;
+  flex: 0 1 auto;
   width: max-content;
   max-width: 100%;
   align-self: flex-start;
@@ -5092,8 +5151,12 @@ body[data-dsh-maid-atelier]:not([data-ds-dark-theme])
 }
 
 body[data-dsh-maid-atelier][data-ds-dark-theme]
-  [data-variant='think'] > [data-open='true'] > [data-disclosure-row] {
+  :is(
+    [data-variant='think'] > [data-open='true'],
+    [data-variant='think'] > [data-open='true'] > [data-disclosure-header]
+  ) > [data-disclosure-row] {
   display: inline-flex;
+  flex: 0 1 auto;
   width: max-content;
   max-width: 100%;
   align-self: flex-start;
@@ -5112,9 +5175,11 @@ body[data-dsh-maid-atelier][data-ds-dark-theme]
    an 8% wash. Keep the sticky header strip above, and give the body an even
    porcelain pane with a stronger blur and a hairline edge. Border-box sizing
    keeps the padding inside max-width: a content-box pane was 24px wider than
-   its column and gave scrollable process groups a horizontal scrollbar. */
+   its column and gave scrollable process groups a horizontal scrollbar.
+   DSH 0.2.1 wraps the row in [data-disclosure-header], so the body follows
+   the header there and the row itself in 0.2.0. */
 body[data-dsh-maid-atelier]:not([data-ds-dark-theme])
-  [data-variant='think'] > [data-open='true'] > [data-disclosure-row] + * {
+  [data-variant='think'] > [data-open='true'] > :is([data-disclosure-row], [data-disclosure-header]) + * {
   display: inline-block;
   box-sizing: border-box;
   width: max-content;
@@ -5135,7 +5200,7 @@ body[data-dsh-maid-atelier]:not([data-ds-dark-theme])
 }
 
 body[data-dsh-maid-atelier][data-ds-dark-theme]
-  [data-variant='think'] > [data-open='true'] > [data-disclosure-row] + * {
+  [data-variant='think'] > [data-open='true'] > :is([data-disclosure-row], [data-disclosure-header]) + * {
   display: inline-block;
   box-sizing: border-box;
   width: max-content;
@@ -5232,7 +5297,7 @@ body[data-dsh-maid-atelier][data-ds-dark-theme]
 body[data-dsh-maid-atelier]
   [data-step-process-body]:not([hidden]):is([data-scroll-up], [data-scroll-down])
   :is(
-    [data-variant='think'] > [data-open='true'] > [data-disclosure-row] + *,
+    [data-variant='think'] > [data-open='true'] > :is([data-disclosure-row], [data-disclosure-header]) + *,
     [data-variant]:not([data-variant='think']) > [data-open='true'],
     [data-chat-flow-kind='context'] > [data-slot='conversation.chat.node'] > [data-open='true'],
     [data-workflow-run] > [data-open='true']
@@ -5402,7 +5467,11 @@ body[data-dsh-maid-atelier][data-ds-dark-theme] [data-changes-hover-preview] [da
   color: #e3e9f7;
 }
 
-body[data-dsh-maid-atelier] [data-tool='present'] > :not([data-open='true']) > [data-disclosure-row] {
+body[data-dsh-maid-atelier] :is(
+  [data-tool='present'] > :not([data-open='true']),
+  [data-tool='present'] > :not([data-open='true']) > [data-disclosure-header]
+) > [data-disclosure-row] {
+  flex: 0 1 auto;
   width: max-content;
   max-width: 100%;
   border-radius: 8px;

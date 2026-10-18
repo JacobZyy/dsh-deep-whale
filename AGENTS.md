@@ -11,14 +11,21 @@
 
 ## Code Review Rules
 
+### Bug ownership and third-party compatibility
+
+- 以同一官方 DSH 版本、相同场景和配置为对照：官方默认界面正常、启用本仓库皮肤后出现的问题，归本仓库；默认界面与皮肤下均存在的同一问题，归宿主或对应插件，不由皮肤兜底。皮肤额外引入或加重的部分仍归本仓库。
+- 第三方桌面发行版不等于官方 DSH。先核对发行来源、精确版本及其对官方插件的修改，区分官方原版缺陷、皮肤缺陷和第三方改动造成的兼容冲突。只有源码分析或报告者描述时，注明证据边界，不把推断写成已完成的运行时对照。
+- 若第三方修改官方插件后造成兼容冲突，先判断能否在既有职责内通过通用、简洁且符合官方契约的改进解决。若必须识别该插件的专属 DOM、增加专用例外或补偿其修改结果，则不在皮肤中修复；说明冲突来源与归属，交由第三方处理，避免积累针对其他插件的补丁。仅在第三方环境中停用皮肤后恢复，不自动意味着本仓库必须承担兼容修复。
+
 ### Skin lifecycle
 
 - Treat every DOM or CSS mutation, observer, event listener, timer, animation frame, and injected node as skin-owned state. Flag any path where partial `apply()` failure, disposal, repeated activation, or hot switching can leave state behind or remove another activation's state. Safe path: register cleanup before fallible work, retain exact original values and owned handles, and restore only what the current activation changed.
 
 ### Product compatibility
 
+- 新改动面向当前已适配的官方 DSH 基线，不为旧宿主增加向下兼容分支或回退；使用新接口时同步提高皮肤的宿主版本下限。旧宿主用户使用对应旧版皮肤，或基于旧版本自行维护。此原则不要求在无关任务中清理已有历史兼容代码。
 - This repository ships presentation-only skins. Flag changes that alter DSH services, events, or model requests; require remote runtime assets; block native controls or overlays; or rely on unstable DOM selectors without a safe fallback. Safe path: scope CSS and DOM decoration to the active skin and preserve native behavior across light and dark themes, narrow and wide sidebars, conversation and workspace views, and browser and desktop layouts.
-- 两套皮肤的 `package.json` 用可选 peer `@deepseek-ai/dsh` 声明已适配的小版本（当前 `>=0.1.7-rc.1 <0.3.0-0`，覆盖 0.1.7 与 0.2.x）；DSH 0.1.7+ 在范围外自动停用皮肤，由皮肤管理器提供按精确版本的手动放行。适配下一个 DSH 小版本（含 `dev` 上的 alpha 预适配）时必须同步放宽上限，否则皮肤在新宿主上会被停用。皮肤管理器只写下限，保持可用。`skin-manager/tests/package-meta.spec.ts` 固定这些范围。
+- 两套皮肤的 `package.json` 用可选 peer `@deepseek-ai/dsh` 声明已适配的小版本（当前 `>=0.2.0-rc.2 <0.3.0-0`，以 0.2.0-rc.2 为下限）；DSH 0.1.7+ 在范围外自动停用皮肤，由皮肤管理器提供按精确版本的手动放行。适配下一个 DSH 小版本（含 `dev` 上的 alpha 预适配）时必须同步放宽上限，否则皮肤在新宿主上会被停用。皮肤管理器只写下限，保持可用。`skin-manager/tests/package-meta.spec.ts` 固定这些范围。
 - `skin.json.dshCompatibility` records the latest explicitly verified DSH build in `x.y.zrcN` form. Routine fixes do not change it; whenever a skin is adapted or revalidated for a newer DSH build, update every affected manifest before building. `skin.build.json` 由各皮肤包目录内的 `npm run build` 生成（`tsdown` 后接 `scripts/write-skin-build.mjs`）；绝不可手改其 fingerprint。两套皮肤各有该清单与指纹文件，skin-manager 没有 `skin.json`，其 build 只跑 `tsdown`。
 
 ### Distribution and attribution
