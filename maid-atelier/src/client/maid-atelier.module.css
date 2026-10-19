@@ -5481,23 +5481,6 @@ body[data-dsh-maid-atelier] [data-tool='present'] > [data-open='true'] {
   border-radius: 10px;
 }
 
-/* Running reasoning becomes a restrained gold-and-periwinkle service sweep.
-   The data hooks are stable and later assets can replace this CSS-only pass. */
-body[data-dsh-maid-atelier] [data-variant='think'][data-state='running'] [class*='row']::after {
-  left: -240px;
-  width: 240px;
-  background: linear-gradient(90deg, transparent, rgba(225, 207, 170, 0.3) 46%, rgba(142, 165, 218, 0.24) 62%, transparent);
-  animation: maid-atelier-reasoning-sweep 2.8s ease-in-out infinite;
-  will-change: transform, opacity;
-}
-
-@keyframes maid-atelier-reasoning-sweep {
-  0% { transform: translate3d(0, 0, 0); opacity: 0; }
-  15% { opacity: 1; }
-  88% { opacity: 1; }
-  100% { transform: translate3d(calc(100vw + 240px), 0, 0); opacity: 0; }
-}
-
 body[data-dsh-maid-atelier] [data-state='running'] :is([class*='runState'], [class*='stateDot']) {
   filter: drop-shadow(0 0 6px rgba(197, 164, 104, 0.7));
 }
@@ -6458,7 +6441,6 @@ body[data-dsh-maid-atelier] [class*='titlebar'] [class*='button']:hover {
     animation: none;
   }
 
-  body[data-dsh-maid-atelier] [data-variant='think'][data-state='running'] [class*='row']::after,
   body[data-dsh-maid-atelier] [data-composer-card] button {
     animation: none;
     transition: none;

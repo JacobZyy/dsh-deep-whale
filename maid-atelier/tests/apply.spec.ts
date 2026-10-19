@@ -2815,17 +2815,9 @@ describe('Maid Atelier skin apply', () => {
     expect(reducedMotionRules).toContain('animation: none')
   })
 
-  it('moves the running reasoning sweep on the compositor instead of relayout', () => {
-    const sweepRule = CSS.match(
-      /\[data-variant='think'\]\[data-state='running'\] \[class\*='row'\]::after\s*\{([^}]*)\}/s,
-    )?.[1] ?? ''
-    const sweepKeyframes = CSS.match(
-      /@keyframes maid-atelier-reasoning-sweep\s*\{([\s\S]*?)\n\}/,
-    )?.[1] ?? ''
-    expect(sweepRule).toContain('left: -240px')
-    expect(sweepRule).toContain('will-change: transform, opacity')
-    expect(sweepKeyframes).toContain('transform: translate3d(')
-    expect(sweepKeyframes).not.toMatch(/\bleft\s*:/)
+  it('keeps no running reasoning sweep on the content-less row pseudo element', () => {
+    expect(CSS).not.toContain('maid-atelier-reasoning-sweep')
+    expect(CSS).not.toMatch(/\[data-variant='think'\]\[data-state='running'\] \[class\*='row'\]::after/)
   })
 
   it('keeps the sidebar mascot subordinate to navigation and behind the lower ornament', () => {
