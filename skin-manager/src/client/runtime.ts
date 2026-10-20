@@ -14,7 +14,7 @@ import { PreferencesStore, mergePreferences, type Preferences } from './preferen
 import { millisecondsToNextMinute, scheduleVisibility } from './schedule.ts'
 import { assertPreferencesImportable } from './transfer.ts'
 
-export interface RegistrySnapshot {
+interface RegistrySnapshot {
   definitions: SkinCustomizationDefinition[]
   revision: number
 }

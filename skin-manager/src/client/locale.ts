@@ -9,7 +9,7 @@
 import { useSyncExternalStore } from 'react'
 import type { SelectOption, SkinCustomizationDefinition, SkinSetting } from '../protocol.ts'
 
-export type UiLang = 'zh' | 'en'
+type UiLang = 'zh' | 'en'
 
 function detectUiLang(): UiLang {
   const lang = document.documentElement.lang || window.navigator.language || 'en'

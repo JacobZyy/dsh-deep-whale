@@ -18,7 +18,6 @@
 import type { Context } from '@deepseek-ai/cordis'
 
 export const MAID_TABLE_SELECTOR = '.md-table-wide'
-export const MAID_TABLE_FILL_SELECTOR = '.md-table-wide'
 const SKIN_OWNER = 'maid-atelier'
 const EXPANDABLE_ATTRIBUTE = 'data-maid-table-expandable'
 const OPEN_ATTRIBUTE = 'data-maid-table-open'

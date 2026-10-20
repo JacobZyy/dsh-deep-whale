@@ -97,6 +97,12 @@ function viewportMeta(): HTMLMetaElement {
 }
 
 let disposers: Array<() => void> = []
+let coarsePointer = false
+let mediaListeners = new Set<() => void>()
+
+function notifyLayout(): void {
+  for (const listener of mediaListeners) listener()
+}
 
 /** Install and register the disposer, so a failed assertion cannot leak listeners. */
 function install(): () => void {
@@ -108,27 +114,204 @@ function install(): () => void {
 beforeEach(() => {
   document.head.innerHTML = ''
   document.body.innerHTML = ''
+  document.body.removeAttribute('data-maid-conversation-active')
   disposers = []
+  coarsePointer = false
+  mediaListeners = new Set()
   setViewport(390, 844)
+  vi.stubGlobal('matchMedia', (query: string) => ({
+    get matches() {
+      return (query.includes('max-width') && window.innerWidth <= 700)
+        || (query.includes('pointer: coarse') && coarsePointer)
+    },
+    media: query,
+    addEventListener: (_type: string, listener: () => void) => { mediaListeners.add(listener) },
+    removeEventListener: (_type: string, listener: () => void) => { mediaListeners.delete(listener) },
+  }))
 })
 
 afterEach(() => {
   for (const dispose of disposers) dispose()
+  vi.restoreAllMocks()
+  vi.unstubAllGlobals()
   disposers = []
   document.documentElement.removeAttribute('data-maid-keyboard')
   document.documentElement.removeAttribute('style')
 })
 
 describe('Maid Atelier phone viewport', () => {
-  it('measures the shell without pinning it while no keyboard is up', async () => {
-    installVisualViewport({ height: 844, offsetTop: 0, scale: 1 })
+  it('shares viewport work until the last overlapping activation is released', async () => {
+    const visual = installVisualViewport({ height: 404, offsetTop: 0, scale: 1 })
+    const card = mountComposerCard(200)
+    const measure = vi.spyOn(card, 'getBoundingClientRect')
+    const first = install()
+    const second = install()
+    await flush()
+    expect(mediaListeners.size).toBe(1)
+    expect(visual.registrations).toEqual(['resize', 'scroll'])
+    expect(measure).toHaveBeenCalledTimes(1)
+
+    first()
+    expect(varOf('--maid-vv-height')).toBe('404px')
+    expect(document.documentElement.getAttribute('data-maid-keyboard')).toBe('open')
+    second()
+    expect(visual.registrations).toEqual([])
+    expect(mediaListeners.size).toBe(0)
+    expect(varOf('--maid-vv-height')).toBe('')
+    expect(document.documentElement.hasAttribute('data-maid-keyboard')).toBe(false)
+  })
+
+  it('leaves a wide desktop without viewport work or a modified host hint', async () => {
+    setViewport(1400, 1000)
+    const meta = viewportMeta()
+    const visual = installVisualViewport({ height: 1000, offsetTop: 0, scale: 1 })
+    const card = mountComposerCard(438)
+    const measure = vi.spyOn(card, 'getBoundingClientRect')
+    const frames = vi.spyOn(window, 'requestAnimationFrame')
+    const timers = vi.spyOn(globalThis, 'setTimeout')
+    install()
+
+    expect(timers).not.toHaveBeenCalled()
+    for (const height of [950, 900, 850]) {
+      setViewport(1300, height)
+      window.dispatchEvent(new Event('resize'))
+      document.dispatchEvent(new Event('focusin'))
+      visual.set({ height })
+    }
+    await flush()
+
+    expect(frames).not.toHaveBeenCalled()
+    expect(measure).not.toHaveBeenCalled()
+    expect(visual.registrations).toEqual([])
+    expect(varOf('--maid-vv-height')).toBe('')
+    expect(varOf('--maid-vv-top')).toBe('')
+    expect(meta.content).toBe('width=device-width, initial-scale=1')
+  })
+
+  it('activates and releases the viewport as a desktop window crosses the phone boundary', async () => {
+    setViewport(1400, 844)
+    const meta = viewportMeta()
+    const visual = installVisualViewport({ height: 844, offsetTop: 0, scale: 1 })
     mountComposerCard(438)
+    const dispose = install()
+    expect(visual.registrations).toEqual([])
+
+    setViewport(390, 844)
+    notifyLayout()
+    await flush()
+    expect(visual.registrations).toEqual(['resize', 'scroll'])
+    expect(varOf('--maid-vv-height')).toBe('844px')
+    expect(meta.content).toBe('width=device-width, initial-scale=1')
+
+    visual.set({ height: 404 })
+    await flush()
+    expect(document.documentElement.getAttribute('data-maid-keyboard')).toBe('open')
+
+    setViewport(1400, 844)
+    notifyLayout()
+    expect(visual.registrations).toEqual([])
+    expect(varOf('--maid-vv-height')).toBe('')
+    expect(varOf('--maid-vv-top')).toBe('')
+    expect(document.documentElement.hasAttribute('data-maid-keyboard')).toBe(false)
+    expect(meta.content).toBe('width=device-width, initial-scale=1')
+
+    visual.set({ height: 844 })
+    setViewport(390, 844)
+    notifyLayout()
+    await flush()
+    expect(visual.registrations).toEqual(['resize', 'scroll'])
+    dispose()
+    expect(mediaListeners.size).toBe(0)
+    notifyLayout()
+    expect(visual.registrations).toEqual([])
+  })
+
+  it('measures only once per keyboard opening across viewport scrolling and focus changes', async () => {
+    const visual = installVisualViewport({ height: 844, offsetTop: 0, scale: 1 })
+    const card = mountComposerCard(200)
+    const measure = vi.spyOn(card, 'getBoundingClientRect')
+    install()
+    await flush()
+    visual.set({ height: 404 })
+    await flush()
+    expect(measure).toHaveBeenCalledTimes(1)
+    visual.set({ height: 380, offsetTop: 12 })
+    document.dispatchEvent(new Event('focusin'))
+    await flush()
+    expect(measure).toHaveBeenCalledTimes(1)
+    visual.set({ height: 844, offsetTop: 0 })
+    await flush()
+    visual.set({ height: 404 })
+    await flush()
+    expect(measure).toHaveBeenCalledTimes(2)
+  })
+
+  it('publishes no inherited viewport dimensions on a wide touch screen until the keyboard opens', async () => {
+    coarsePointer = true
+    setViewport(844, 390)
+    const visual = installVisualViewport({ height: 390, offsetTop: 0, scale: 1 })
+    const card = mountComposerCard(200)
+    const measure = vi.spyOn(card, 'getBoundingClientRect')
+    install()
+    await flush()
+    expect(varOf('--maid-vv-height')).toBe('')
+    expect(measure).not.toHaveBeenCalled()
+    visual.set({ height: 180 })
+    await flush()
+    expect(varOf('--maid-vv-height')).toBe('180px')
+    expect(measure).toHaveBeenCalledTimes(1)
+    visual.set({ height: 390 })
+    await flush()
+    expect(varOf('--maid-vv-height')).toBe('')
+    expect(varOf('--maid-vv-top')).toBe('')
+    expect(document.documentElement.hasAttribute('data-maid-keyboard')).toBe(false)
+  })
+
+  it('restores existing root values and preserves values another owner changed', async () => {
+    const root = document.documentElement
+    const meta = viewportMeta()
+    root.style.setProperty('--maid-vv-height', '700px', 'important')
+    root.style.setProperty('--maid-vv-top', '4px')
+    root.setAttribute('data-maid-keyboard', 'previous')
+    installVisualViewport({ height: 404, offsetTop: 12, scale: 1 })
+    mountComposerCard(200)
+    const dispose = install()
+    await flush()
+    root.style.setProperty('--maid-vv-top', '24px', 'important')
+    meta.content = 'width=device-width, viewport-fit=cover'
+    dispose()
+    expect(varOf('--maid-vv-height')).toBe('700px')
+    expect(root.style.getPropertyPriority('--maid-vv-height')).toBe('important')
+    expect(varOf('--maid-vv-top')).toBe('24px')
+    expect(root.style.getPropertyPriority('--maid-vv-top')).toBe('important')
+    expect(root.getAttribute('data-maid-keyboard')).toBe('previous')
+    expect(meta.content).toBe('width=device-width, viewport-fit=cover')
+  })
+
+  it('releases partial activation when a viewport listener cannot be installed', () => {
+    const meta = viewportMeta()
+    const visual = installVisualViewport({ height: 844, offsetTop: 0, scale: 1 })
+    vi.spyOn(window.visualViewport!, 'addEventListener').mockImplementationOnce(() => {
+      throw new Error('fixture viewport listener failure')
+    })
+    expect(() => install()).toThrow('fixture viewport listener failure')
+    expect(mediaListeners.size).toBe(0)
+    expect(visual.registrations).toEqual([])
+    expect(meta.content).toBe('width=device-width, initial-scale=1')
+    expect(varOf('--maid-vv-height')).toBe('')
+  })
+
+  it('publishes the phone height without measuring the composer while no keyboard is up', async () => {
+    installVisualViewport({ height: 844, offsetTop: 0, scale: 1 })
+    const card = mountComposerCard(438)
+    const measure = vi.spyOn(card, 'getBoundingClientRect')
     install()
     await flush()
 
     expect(document.documentElement.hasAttribute('data-maid-keyboard')).toBe(false)
     expect(varOf('--maid-vv-height')).toBe('844px')
     expect(varOf('--maid-vv-top')).toBe('0px')
+    expect(measure).not.toHaveBeenCalled()
   })
 
   it('pins the shell once the keyboard takes a real slice of the viewport', async () => {
@@ -224,19 +407,38 @@ describe('Maid Atelier phone viewport', () => {
     expect(scrollIntoView).not.toHaveBeenCalled()
   })
 
-  it('appends the resize hint once and gives the host tag back on dispose', async () => {
+  it('preserves native viewport panning while a keyboard is open', async () => {
     const meta = viewportMeta()
-    installVisualViewport({ height: 844, offsetTop: 0, scale: 1 })
+    installVisualViewport({ height: 404, offsetTop: 24, scale: 1 })
     mountComposerCard(438)
     const dispose = install()
     await flush()
 
-    const hinted = meta.getAttribute('content') ?? ''
-    expect(hinted).toContain('interactive-widget=resizes-content')
-    expect(hinted.match(/interactive-widget/g)).toHaveLength(1)
+    expect(meta.getAttribute('content')).toBe('width=device-width, initial-scale=1')
 
     dispose()
     expect(meta.getAttribute('content')).toBe('width=device-width, initial-scale=1')
+  })
+
+  it('leaves an active conversation caret to the browser in a short keyboard viewport', async () => {
+    coarsePointer = true
+    setViewport(821, 276)
+    const visual = installVisualViewport({ height: 276, offsetTop: 0, scale: 1 })
+    document.body.setAttribute('data-maid-conversation-active', '')
+    const card = mountComposerCard(88, 188)
+    const measure = vi.spyOn(card, 'getBoundingClientRect')
+    const scrollIntoView = vi.fn()
+    card.scrollIntoView = scrollIntoView
+    install()
+    await flush()
+
+    visual.set({ height: 60, offsetTop: 118 })
+    await flush()
+
+    expect(varOf('--maid-vv-height')).toBe('60px')
+    expect(varOf('--maid-vv-top')).toBe('118px')
+    expect(measure).not.toHaveBeenCalled()
+    expect(scrollIntoView).not.toHaveBeenCalled()
   })
 
   it('gives back every variable, attribute and listener on dispose', async () => {

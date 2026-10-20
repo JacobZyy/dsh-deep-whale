@@ -2,23 +2,21 @@
  * Phone viewport: keep the host shell and the composer inside the band the
  * software keyboard leaves visible.
  *
- * `html`, `body` and `#root` are height-locked to the layout viewport, and the
- * layout viewport does not shrink for the software keyboard — iOS never does,
- * Android only when the page opts in through the `interactive-widget` viewport
- * hint. A focused composer therefore stays behind the keyboard, and the
- * height-locked page has no scroll range to bring it back.
+ * The landing-page shell needs to follow the visual viewport. Active
+ * conversations instead keep the host's viewport behavior: the browser pans
+ * to the caret, including when a landscape keyboard leaves less room than
+ * the composer itself. Resizing that shell would put the editor above its
+ * scrollport and behind the conversation header.
  *
- * This module appends that hint where the engine accepts it and, when the
- * keyboard still shrinks only the visual viewport, publishes `--maid-vv-height`
- * and `--maid-vv-top` and marks the root so the stylesheet can pin the
- * application to the band `VisualViewport` reports. It also brings the composer
+ * This module publishes `--maid-vv-height` and `--maid-vv-top` and marks the
+ * root so the stylesheet can pin the landing page to the band `VisualViewport`
+ * reports. It also brings the landing-page composer
  * back into the band once per keyboard opening, which is what a landscape phone
  * needs: the hero stack is centred and taller than the band, so the composer
  * would otherwise sit below the fold.
  *
  * Every write is idempotent and remembered, so a viewport that stops changing
- * stops writing; the disposer removes the listeners, the published variables and
- * the viewport hint the module appended — and nothing else.
+ * stops writing; the disposer removes the listeners and published state.
  */
 
 /** Root attribute that tells the stylesheet the shell is pinned to the keyboard. */
@@ -35,18 +33,77 @@ const TAKEOVER_CARD_SELECTOR = ":is([data-question-key], [data-plan-review-key])
 const PHONE_MAX_WIDTH = 700
 /** A touch pointer owns the keyboard shell even in landscape, where the shell is wide. */
 const COARSE_QUERY = '(pointer: coarse)'
+/** Narrow desktop windows share the phone layout; landscape phones use touch. */
+const MOBILE_QUERY = `(max-width: ${PHONE_MAX_WIDTH}px), ${COARSE_QUERY}`
 /** A visual viewport this much shorter than the layout viewport is a keyboard. */
 const KEYBOARD_MIN_GAP = 120
 /** The composer mounts with the shell; a few settle passes cover the rest. */
 const SETTLE_DELAYS = [250, 1000, 3000]
 
+const viewports = new WeakMap<HTMLElement, { owners: number, dispose: () => void }>()
+
 /**
  * Keep the phone shell inside the visual viewport while the software keyboard is
  * open.
  * @param body - skin owning element (document.body); supplies the document and view.
- * @returns disposer restoring the meta hint and removing every listener and variable.
+ * @returns disposer removing every owned listener, attribute and variable.
  */
 export function installMaidMobileViewport(body: HTMLElement): () => void {
+  let state = viewports.get(body)
+  if (state === undefined) {
+    state = { owners: 0, dispose: installViewportController(body) }
+    viewports.set(body, state)
+  }
+  const owned = state
+  owned.owners++
+  let released = false
+  return () => {
+    if (released) return
+    released = true
+    if (--owned.owners > 0) return
+    viewports.delete(body)
+    owned.dispose()
+  }
+}
+
+/** Share one media listener and viewport activation across overlapping applies. */
+function installViewportController(body: HTMLElement): () => void {
+  const view = body.ownerDocument.defaultView
+  const media = view?.matchMedia?.(MOBILE_QUERY)
+  if (media === undefined) return () => {}
+
+  let disposeViewport: (() => void) | undefined
+  let disposed = false
+  const synchronize = (): void => {
+    if (disposed) return
+    if (media.matches) {
+      disposeViewport ??= installMobileViewport(body, media)
+    } else {
+      disposeViewport?.()
+      disposeViewport = undefined
+    }
+  }
+  const dispose = (): void => {
+    disposed = true
+    media.removeEventListener('change', synchronize)
+    disposeViewport?.()
+    disposeViewport = undefined
+  }
+
+  // A desktop resize within the wide layout never enters the viewport path.
+  // The media boundary still activates it when the phone layout becomes visible.
+  try {
+    media.addEventListener('change', synchronize)
+    synchronize()
+  } catch (error) {
+    dispose()
+    throw error
+  }
+  return dispose
+}
+
+/** Install viewport work only while its phone or touch consumers can use it. */
+function installMobileViewport(body: HTMLElement, media: MediaQueryList): () => void {
   const doc = body.ownerDocument
   const defaultView = doc.defaultView
   if (defaultView === null) return () => {}
@@ -55,16 +112,6 @@ export function installMaidMobileViewport(body: HTMLElement): () => void {
   const view = defaultView
   const root = doc.documentElement
   const visual = view.visualViewport ?? null
-
-  // The host owns the viewport tag; only the appended hint is ours to remove.
-  const meta = doc.querySelector<HTMLMetaElement>("meta[name='viewport']")
-  const originalContent = meta?.getAttribute('content') ?? null
-  const hinted = meta !== null
-    && originalContent !== null
-    && !originalContent.includes('interactive-widget')
-  if (meta !== null && hinted) {
-    meta.setAttribute('content', `${originalContent}, interactive-widget=resizes-content`)
-  }
 
   const raf = view.requestAnimationFrame?.bind(view)
   const caf = view.cancelAnimationFrame?.bind(view)
@@ -77,6 +124,31 @@ export function installMaidMobileViewport(body: HTMLElement): () => void {
   let topWritten: string | null = null
   let keyboardMarked = false
   const settleTimers: Array<ReturnType<typeof setTimeout>> = []
+  const originalHeight = root.style.getPropertyValue(HEIGHT_PROPERTY)
+  const originalHeightPriority = root.style.getPropertyPriority(HEIGHT_PROPERTY)
+  const originalTop = root.style.getPropertyValue(TOP_PROPERTY)
+  const originalTopPriority = root.style.getPropertyPriority(TOP_PROPERTY)
+  const originalKeyboard = root.getAttribute(KEYBOARD_ATTRIBUTE)
+
+  const restoreViewport = (): void => {
+    if (heightWritten !== null && root.style.getPropertyValue(HEIGHT_PROPERTY) === heightWritten
+      && root.style.getPropertyPriority(HEIGHT_PROPERTY) === '') {
+      if (originalHeight === '') root.style.removeProperty(HEIGHT_PROPERTY)
+      else root.style.setProperty(HEIGHT_PROPERTY, originalHeight, originalHeightPriority)
+    }
+    if (topWritten !== null && root.style.getPropertyValue(TOP_PROPERTY) === topWritten
+      && root.style.getPropertyPriority(TOP_PROPERTY) === '') {
+      if (originalTop === '') root.style.removeProperty(TOP_PROPERTY)
+      else root.style.setProperty(TOP_PROPERTY, originalTop, originalTopPriority)
+    }
+    heightWritten = null
+    topWritten = null
+    if (keyboardMarked && root.getAttribute(KEYBOARD_ATTRIBUTE) === 'open') {
+      if (originalKeyboard === null) root.removeAttribute(KEYBOARD_ATTRIBUTE)
+      else root.setAttribute(KEYBOARD_ATTRIBUTE, originalKeyboard)
+    }
+    keyboardMarked = false
+  }
 
   /** The card whose top the band must contain: the composer, or its takeover. */
   const resolveAnchor = (): Element | null => doc.querySelector(COMPOSER_CARD_SELECTOR)
@@ -91,19 +163,22 @@ export function installMaidMobileViewport(body: HTMLElement): () => void {
   function update(): void {
     if (disposed) return
     const phone = view.innerWidth <= PHONE_MAX_WIDTH
-    // A landscape phone is wider than the phone breakpoint, so the keyboard
-    // shell keys off the pointer as well as the width.
-    const coarse = view.matchMedia?.(COARSE_QUERY)?.matches ?? false
     // A pinch-zoom keeps the layout viewport semantics the host shipped; only a
     // genuine keyboard gap pins the shell to the visual viewport.
     const unscaled = visual === null || Math.abs(visual.scale - 1) <= 0.01
     const height = visual !== null && unscaled ? visual.height : view.innerHeight
     const offset = visual !== null && unscaled ? visual.offsetTop : 0
-    const keyboard = (coarse || phone)
+    const keyboard = media.matches
       && visual !== null
       && unscaled
       && view.innerHeight - visual.height > KEYBOARD_MIN_GAP
     const opened = keyboard && !keyboardMarked
+
+    // Wide touch screens only consume these properties while the keyboard is up.
+    if (!phone && !keyboard) {
+      restoreViewport()
+      return
+    }
 
     heightWritten = publish(HEIGHT_PROPERTY, `${Math.round(height)}px`, heightWritten)
     topWritten = publish(TOP_PROPERTY, `${Math.round(offset)}px`, topWritten)
@@ -111,21 +186,26 @@ export function installMaidMobileViewport(body: HTMLElement): () => void {
     if (keyboard !== keyboardMarked) {
       keyboardMarked = keyboard
       if (keyboard) root.setAttribute(KEYBOARD_ATTRIBUTE, 'open')
-      else root.removeAttribute(KEYBOARD_ATTRIBUTE)
+      else if (originalKeyboard === null) root.removeAttribute(KEYBOARD_ATTRIBUTE)
+      else root.setAttribute(KEYBOARD_ATTRIBUTE, originalKeyboard)
     }
 
+    if (!opened) return
+    // Let the browser reveal the caret in an active conversation. Scrolling
+    // the whole card can move it away again when the card exceeds the band.
+    if (body.hasAttribute('data-maid-conversation-active')) return
     // Reading after the attribute write flushes the pinned layout, so the card
     // is measured where the reader will actually see it.
     const anchor = resolveAnchor()
     const box = anchor?.getBoundingClientRect()
-    if (!opened || anchor === null || box === undefined || box.bottom <= offset + height + 1) return
+    if (anchor === null || box === undefined || box.bottom <= offset + height + 1) return
 
     // The hero stack is centred and taller than a landscape band, so it would
     // leave the composer below the fold. Bring it back once per keyboard opening
     // rather than fighting the host on every frame.
     const nudge = (): void => {
       nudgeFrame = null
-      if (!disposed) anchor.scrollIntoView?.({ block: 'end', inline: 'nearest' })
+      if (!disposed && keyboardMarked) anchor.scrollIntoView?.({ block: 'end', inline: 'nearest' })
     }
     if (raf === undefined) nudge()
     else nudgeFrame = raf(nudge)
@@ -148,17 +228,7 @@ export function installMaidMobileViewport(body: HTMLElement): () => void {
 
   const onViewportChange = (): void => { schedule() }
 
-  view.addEventListener('resize', onViewportChange)
-  doc.addEventListener('focusin', onViewportChange, true)
-  visual?.addEventListener('resize', onViewportChange)
-  visual?.addEventListener('scroll', onViewportChange)
-
-  schedule()
-  for (const delay of SETTLE_DELAYS) {
-    settleTimers.push(setTimeout(() => { schedule() }, delay))
-  }
-
-  return () => {
+  const dispose = (): void => {
     disposed = true
     if (frame !== null && caf !== undefined) caf(frame)
     if (nudgeFrame !== null && caf !== undefined) caf(nudgeFrame)
@@ -171,12 +241,22 @@ export function installMaidMobileViewport(body: HTMLElement): () => void {
     doc.removeEventListener('focusin', onViewportChange, true)
     visual?.removeEventListener('resize', onViewportChange)
     visual?.removeEventListener('scroll', onViewportChange)
-    if (keyboardMarked) root.removeAttribute(KEYBOARD_ATTRIBUTE)
-    keyboardMarked = false
-    if (heightWritten !== null) root.style.removeProperty(HEIGHT_PROPERTY)
-    if (topWritten !== null) root.style.removeProperty(TOP_PROPERTY)
-    heightWritten = null
-    topWritten = null
-    if (meta !== null && hinted && originalContent !== null) meta.setAttribute('content', originalContent)
+    restoreViewport()
   }
+
+  try {
+    view.addEventListener('resize', onViewportChange)
+    doc.addEventListener('focusin', onViewportChange, true)
+    visual?.addEventListener('resize', onViewportChange)
+    visual?.addEventListener('scroll', onViewportChange)
+
+    schedule()
+    for (const delay of SETTLE_DELAYS) {
+      settleTimers.push(setTimeout(() => { schedule() }, delay))
+    }
+  } catch (error) {
+    dispose()
+    throw error
+  }
+  return dispose
 }

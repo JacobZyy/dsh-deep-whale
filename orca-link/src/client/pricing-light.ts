@@ -21,7 +21,6 @@ import { hasMutationOutsideTranscript } from './mutation-filter.ts'
 export type PriceBand = 'high' | 'transition' | 'low'
 
 const BEIJING_OFFSET_MS = 8 * 3_600_000
-const MINUTE_MS = 60_000
 const HOUR_MS = 3_600_000
 const DAY_MS = 24 * HOUR_MS
 
@@ -156,7 +155,7 @@ export function nextPriceChangeAt(date: Date): Date {
   return new Date(dayStart + 9 * HOUR_MS - BEIJING_OFFSET_MS)
 }
 
-export interface PriceSchedule {
+interface PriceSchedule {
   band: PriceBand
   /**
    * Persistent English label shown next to the lamps: HIGH or LOW. During the
@@ -270,7 +269,7 @@ export function priceScheduleAt(date: Date, chinese = detectChinese()): PriceSch
   }
 }
 
-export interface PricingLightClasses {
+interface PricingLightClasses {
   light: string
   housing: string
   lamp: string

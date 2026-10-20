@@ -7,10 +7,6 @@ import { skinAssetUrl } from './asset-url.ts'
 
 export const MAID_ATELIER_CHIBI = skinAssetUrl('405917afdb68d725624bbf7e4f1619a35fc4004039b7d553c5528ca5f65308d3.webp')
 
-export const MAID_ATELIER_BRAND = skinAssetUrl('fc8e6b17bad9088221f79733bd9da97a2ca78387bac1132518f4408dbca43f34.webp')
-
-
-
 export const MAID_ATELIER_BOW_CLEAN = skinAssetUrl('dcf64a43ad6b9e71c24c91fb9b1d7fe8af534497fd421213472bea96e6bc04b5.webp')
 
 /** Raster porcelain-and-filigree plate for the live new-session control. */

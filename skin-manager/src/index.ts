@@ -273,7 +273,7 @@ export function activeSkinTarget(sources: string[], catalog: SkinCatalogEntry[])
 }
 
 /** Route seam for the opt-in desktop shortcut icon; absent outside the Windows desktop shell. */
-export interface DesktopIconControl {
+interface DesktopIconControl {
   enabled(): boolean
   setEnabled(enabled: boolean): Promise<DesktopIconResult>
   /** Called after a successful switch; must not throw. */
@@ -338,7 +338,7 @@ interface SkinBuildMetaRaw {
  * fingerprint covers runtime/distribution inputs but never this file itself,
  * avoiding the self-reference of embedding the containing git commit.
  */
-export interface SkinBuildMeta {
+interface SkinBuildMeta {
   fingerprint: string
   /** Git HEAD before this build was produced; an ancestry anchor, not the containing commit. */
   sourceCommit: string | null

@@ -21,7 +21,7 @@ import {
 import { Button, Switch } from '@deepseek-ai/dsh-client-ui-primitives'
 import css from './skin-manager.module.css'
 
-export interface SkinManagerInjected {
+interface SkinManagerInjected {
   registry: SkinCustomizationRegistry
   active(catalog: SkinCatalogEntry[]): SkinTarget | 'unknown'
   /** `acceptRisk` grants the exact skin/DSH version pair the host otherwise refuses. */
@@ -978,7 +978,7 @@ function BackupCard({ registry }: { registry: SkinCustomizationRegistry }) {
 }
 
 /** Present only when the host runs inside the Windows desktop shell. */
-export interface DesktopIconStatus {
+interface DesktopIconStatus {
   enabled: boolean
 }
 
@@ -1000,7 +1000,7 @@ export async function fetchSkinCatalog(): Promise<SkinCatalogEntry[]> {
   return (await fetchSkinCatalogState()).skins
 }
 
-export interface DesktopIconOutcome {
+interface DesktopIconOutcome {
   enabled: boolean
   updated: number
   failed: number

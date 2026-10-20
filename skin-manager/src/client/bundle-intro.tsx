@@ -19,7 +19,7 @@ import css from './skin-manager.module.css'
 export const BUNDLE_CONFIG_SLOT = 'plugins.bundle.config'
 
 /** One entry's source: the bundle's package name and the host build it declares. */
-export interface BundleIntroSource {
+interface BundleIntroSource {
   /** The `plugins.bundle.config` key: the bundle's package name. */
   readonly key: string
   readonly dshCompatibility: string

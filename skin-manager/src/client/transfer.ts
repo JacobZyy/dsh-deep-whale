@@ -40,7 +40,7 @@ export const PREFERENCES_IMPORT_MAX_SKINS = 64
  */
 export const PREFERENCES_IMPORT_MAX_DEPTH = 32
 
-export interface PreferencesExport {
+interface PreferencesExport {
   schema: typeof PREFERENCES_EXPORT_SCHEMA
   source: typeof PREFERENCES_EXPORT_SOURCE
   exportedAt: string
