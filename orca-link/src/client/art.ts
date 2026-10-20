@@ -20,8 +20,3 @@ export const ORCA_LINK_LIGHT_ACTIVE_ART = skinAssetUrl('3605bdd7ccfcc75ca78558f2
 
 export const ORCA_LINK_DARK_HERO_ART = skinAssetUrl('5affe6ca90a22227bc020914e4b9d4dc8913a336ffc4a76e17f5b715fa2e0086.webp')
 export const ORCA_LINK_DARK_ACTIVE_ART = skinAssetUrl('905f86159587cb4f168fdc78dac8ac8b53e3271d829f78878ddb0c81d0e33747.webp')
-export const ORCA_LINK_CHARACTER_ART = skinAssetUrl('6c4d6705e9fca5ac1f0d7a6b3b113dab157e8123d21cea53a2c399106b4f0239.webp')
-
-export const ORCA_LINK_SIDEBAR_ART = skinAssetUrl('0ba862962a5560db2691e9bfb2a925be549f2c23c88c660769bd9d867189f0f2.webp')
-
-export const ORCA_LINK_ART = skinAssetUrl('8e35ddb65f30bb23fcc7752cf5b92b2a1d958b93779eb607f878e0510e1affd9.webp')

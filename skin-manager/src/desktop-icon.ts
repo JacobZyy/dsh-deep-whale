@@ -30,7 +30,7 @@ const MAX_ICON_BYTES = 2 * 1024 * 1024
 // a cold or busy machine that alone has been measured at 11-17 s.
 const POWERSHELL_TIMEOUT_MS = 60_000
 
-export interface DesktopShell {
+interface DesktopShell {
   /** The desktop executable, which is also the Node binary of the host child. */
   execPath: string
 }
@@ -59,7 +59,7 @@ export interface ShortcutChange {
   icon: string
 }
 
-export interface ShortcutWriteResult {
+interface ShortcutWriteResult {
   path: string
   ok: boolean
   error?: string
@@ -72,14 +72,14 @@ export interface ShortcutIo {
   write(changes: ShortcutChange[]): Promise<ShortcutWriteResult[]>
 }
 
-export interface ShortcutRecord {
+interface ShortcutRecord {
   /** IconLocation found before this module first wrote the shortcut. */
   original: string
   /** IconLocation this module last wrote. */
   applied: string
 }
 
-export interface DesktopIconState {
+interface DesktopIconState {
   version: 1
   enabled: boolean
   shortcuts: Record<string, ShortcutRecord>
@@ -105,7 +105,7 @@ export interface DesktopIconResult {
  * the user owns it, which in practice is a security suite's shortcut
  * protection blocking powershell.exe (#200, 360).
  */
-export type ShortcutFailureCode = 'shared-denied' | 'save-blocked'
+type ShortcutFailureCode = 'shared-denied' | 'save-blocked'
 
 /** Folders holding the all-users desktop and Start menu shortcuts. */
 export function sharedShortcutRoots(env: NodeJS.ProcessEnv = process.env): string[] {

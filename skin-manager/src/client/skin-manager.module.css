@@ -717,12 +717,6 @@
   background: var(--dsw-alias-bg-layer-2);
 }
 
-.cardHeaderActions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
 /* A destructive action: the host outline Button, tinted only on hover. */
 .resetButton:hover:not(:disabled) {
   color: var(--dsw-alias-state-danger, #c43d3d);
