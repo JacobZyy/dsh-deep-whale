@@ -362,7 +362,6 @@ describe('Maid Atelier skin apply', () => {
     `
     fiber = await mount()
 
-    expect(document.body.hasAttribute('data-maid-chat-active')).toBe(true)
     expect(document.body.hasAttribute('data-maid-conversation-active')).toBe(true)
     expect(document.body.hasAttribute('data-maid-workspace')).toBe(true)
     expect(document.body.hasAttribute('data-maid-cordis-panel-open')).toBe(true)
@@ -374,7 +373,6 @@ describe('Maid Atelier skin apply', () => {
     document.querySelector('[data-slot="sidebar.settings"] [role="dialog"]')!.remove()
     await flushMutations()
 
-    expect(document.body.hasAttribute('data-maid-chat-active')).toBe(false)
     expect(document.body.hasAttribute('data-maid-conversation-active')).toBe(false)
     expect(document.body.hasAttribute('data-maid-workspace')).toBe(false)
     expect(document.body.hasAttribute('data-maid-cordis-panel-open')).toBe(false)
@@ -1651,11 +1649,11 @@ describe('Maid Atelier skin apply', () => {
     const stageRule = CSS.match(
       /\[data-skin-chrome='character-stage'\]\s*\{([^}]*)\}/s,
     )?.[1] ?? ''
-    const chatLeftRule = CSS.match(
-      /\[data-maid-chat-active\]\s*\[data-maid-character='left'\]\s*\{([^}]*)\}/s,
+    const activeLeftRule = CSS.match(
+      /\[data-maid-conversation-active\]\s*\[data-maid-character='left'\]\s*\{([^}]*)\}/s,
     )?.[1] ?? ''
-    const chatRightRule = CSS.match(
-      /\[data-maid-chat-active\]\s*:is\(\[data-maid-character='right'\], \[data-maid-character='vision'\]\)\s*\{([^}]*)\}/s,
+    const activeRightRule = CSS.match(
+      /\[data-maid-conversation-active\]\s*:is\(\[data-maid-character='right'\], \[data-maid-character='vision'\]\)\s*\{([^}]*)\}/s,
     )?.[1] ?? ''
     const sharedRule = CSS.match(
       /\[data-maid-character\]\s*\{([^}]*)\}/s,
@@ -1701,12 +1699,11 @@ describe('Maid Atelier skin apply', () => {
     expect(baseLeftRule).not.toContain('vw')
     expect(baseRightRule).not.toContain('var(--maid-sidebar-width)')
     expect(baseRightRule).not.toContain('vw')
-    expect(chatLeftRule).toContain('height: 64%')
-    expect(chatRightRule).toContain('height: 62%')
-    expect(chatLeftRule).not.toContain('translate:')
-    expect(chatRightRule).not.toContain('translate:')
+    expect(activeLeftRule).toContain('height: 64%')
+    expect(activeRightRule).toContain('height: 62%')
+    expect(activeLeftRule).not.toContain('translate:')
+    expect(activeRightRule).not.toContain('translate:')
     expect(CSS).not.toMatch(/\[data-maid-character='(?:left|right)'\]\s*\{[^}]*(?:left|right):\s*-/s)
-    expect(CSS).not.toMatch(/\[data-maid-conversation-active\]\s*\[data-maid-character/s)
     // The better-sidebar fixed-indent adaptation is gone: the artwork follows
     // the chat area, so no panel-state projection survives in the character rules.
     expect(CSS).not.toMatch(/\[data-maid-character='right'\][^{]*\{[^}]*clamp\(-460px/s)
