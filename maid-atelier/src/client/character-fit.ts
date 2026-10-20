@@ -1,6 +1,6 @@
 /**
  * Both maids are sized against the conversation column's HEIGHT — 96% and 92%
- * of the stage, retreating to 64%/62% while a chat is on screen — so standing
+ * of the stage, retreating to 64%/62% in an active conversation — so standing
  * side by side they need 0.556 + 0.526 of that height in WIDTH, the maids'
  * intrinsic ratios. That is about 1.08 x the column's height: true on a
  * full-width desktop column, and false as soon as something narrows the column
@@ -12,7 +12,7 @@
  * (`window.innerWidth`, `@media (max-width: 700px / 1080px)`), and a narrower
  * column leaves the viewport untouched, so none of them can fire here. This
  * module measures the two boxes instead, which is exact for whatever produced
- * them: the chat-active retreat, the phone layout, the model-exit feature, or a
+ * them: the active-conversation retreat, the phone layout, the model-exit feature, or a
  * later revision of the character rules.
  *
  * The distance comes from `offsetLeft`/`offsetWidth` — layout geometry, not
@@ -78,7 +78,7 @@ export function installMaidCharacterFit(stage: HTMLElement): () => void {
   if (typeof view.ResizeObserver === 'function') {
     observer = new view.ResizeObserver(schedule)
     // The column's width (stage) and both maids' boxes are the only inputs: the
-    // maids' height is a percentage of the column, and the chat-active retreat
+    // maids' height is a percentage of the column, and the active-conversation retreat
     // changes it again. Anything that moves them moves one of these three.
     observer.observe(stage)
     observer.observe(left)

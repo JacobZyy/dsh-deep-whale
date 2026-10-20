@@ -70,7 +70,6 @@ const SETTINGS_SLOT_DIALOG_SELECTOR = "[data-slot='sidebar.settings'] [role='dia
 const SETTINGS_DIALOG_SELECTOR = `${SETTINGS_SLOT_DIALOG_SELECTOR}, ${SETTINGS_PORTAL_DIALOG_SELECTOR}`
 const SETTINGS_OWNER_SELECTOR = `[data-slot='sidebar.settings'], ${SETTINGS_PORTAL_DIALOG_SELECTOR}`
 const ACTIVE_CONVERSATION_SELECTOR = "[data-phase='active']"
-const ACTIVE_CHAT_SELECTOR = `${ACTIVE_CONVERSATION_SELECTOR} [data-chat-flow]`
 const WORKSPACE_SELECTOR = "header [role='tablist']"
 const CORDIS_PANEL_SELECTOR = '[data-cordis-panel]'
 // Tags the rc.2 settings portal's mask (a direct body child) so CSS can match it
@@ -179,7 +178,6 @@ function createBodyAttributeLease(body: HTMLElement, attribute: string, value = 
 }
 
 const PROJECTED_STATE_ATTRIBUTES = {
-  activeChat: 'data-maid-chat-active',
   activeConversation: 'data-maid-conversation-active',
   cordisPanelOpen: 'data-maid-cordis-panel-open',
   settingsOpen: 'data-maid-settings-open',
@@ -191,7 +189,6 @@ const PROJECTED_STATE_ATTRIBUTES = {
 
 const PROJECTED_STATE_SELECTOR = [
   ACTIVE_CONVERSATION_SELECTOR,
-  '[data-chat-flow]',
   WORKSPACE_SELECTOR,
   CORDIS_PANEL_SELECTOR,
   "[data-slot='main']",
@@ -811,10 +808,6 @@ export function apply(ctx: PanelContext): void {
       if (body.hasAttribute(attribute) !== active) body.toggleAttribute(attribute, active)
     }
     set(
-      PROJECTED_STATE_ATTRIBUTES.activeChat,
-      document.querySelector(ACTIVE_CHAT_SELECTOR) !== null,
-    )
-    set(
       PROJECTED_STATE_ATTRIBUTES.activeConversation,
       document.querySelector(ACTIVE_CONVERSATION_SELECTOR) !== null,
     )
@@ -1053,7 +1046,6 @@ export function apply(ctx: PanelContext): void {
           composerChanged = true
         }
         if (conversationPhaseChanged
-          || record.attributeName === 'data-chat-flow'
           || record.attributeName === 'data-cordis-panel'
           || record.attributeName === 'data-slot'
           || record.attributeName === 'role') {
@@ -1120,7 +1112,6 @@ export function apply(ctx: PanelContext): void {
     attributeFilter: [
       'aria-expanded',
       'aria-selected',
-      'data-chat-flow',
       'data-cordis-panel',
       'data-ds-dark-theme',
       'data-phase',

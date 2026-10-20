@@ -291,15 +291,15 @@ body[data-dsh-maid-atelier][data-ds-dark-theme] [data-maid-character] {
     drop-shadow(0 22px 28px rgba(0, 0, 0, 0.3));
 }
 
-/* Chat alone retreats the two figures toward the edges. Inspection views do
-   not expose data-chat-flow, so Trajectory and similar canvases stay put. */
-body[data-dsh-maid-atelier][data-maid-chat-active]
+/* All active conversation views share the same figure size and opacity, so
+   switching between Chat and Trajectory leaves the artwork in place. */
+body[data-dsh-maid-atelier][data-maid-conversation-active]
   [data-maid-character='left'] {
   height: 64%;
   opacity: 0.9;
 }
 
-body[data-dsh-maid-atelier][data-maid-chat-active]
+body[data-dsh-maid-atelier][data-maid-conversation-active]
   :is([data-maid-character='right'], [data-maid-character='vision']) {
   height: 62%;
   opacity: 0.9;
@@ -319,12 +319,12 @@ body[data-dsh-maid-atelier][data-maid-chat-active]
     max-width: calc(100% - 48px);
   }
 
-  body[data-dsh-maid-atelier][data-maid-chat-active]
+  body[data-dsh-maid-atelier][data-maid-conversation-active]
     [data-maid-character='left'] {
     height: 46%;
   }
 
-  body[data-dsh-maid-atelier][data-maid-chat-active]
+  body[data-dsh-maid-atelier][data-maid-conversation-active]
     :is([data-maid-character='right'], [data-maid-character='vision']) {
     height: 44%;
   }
