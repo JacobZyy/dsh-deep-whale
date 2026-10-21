@@ -637,9 +637,9 @@ body[data-dsh-maid-atelier] header:has([role='tablist']) {
     animation: none;
   }
 
-  body[data-dsh-maid-atelier] [data-maid-workspace-active]::before,
-  body[data-dsh-maid-atelier] [data-maid-workspace-active] > [class*='folder'],
-  body[data-dsh-maid-atelier] [data-maid-workspace-active] [class*='projectText'] {
+  body[data-dsh-maid-atelier] [data-maid-workspace-row]:has(> [class*='folderActive'])::before,
+  body[data-dsh-maid-atelier] [data-maid-workspace-row]:has(> [class*='folderActive']) > [class*='folder'],
+  body[data-dsh-maid-atelier] [data-maid-workspace-row]:has(> [class*='folderActive']) [class*='projectText'] {
     animation: none;
   }
 }
@@ -2650,7 +2650,7 @@ body[data-dsh-maid-atelier][data-maid-sidebar-size='rail']
     width: min(300px, 84vw) !important;
     height: 100dvh !important;
     max-height: 100dvh !important;
-    z-index: 60 !important;
+    z-index: 60;
     border-right: 0.5px solid var(--dsw-alias-border-l3) !important;
     box-shadow: 24px 0 64px rgba(8, 17, 48, 0.35) !important;
     overflow-y: auto !important;
@@ -2830,7 +2830,7 @@ body[data-dsh-maid-atelier] [data-maid-workspace-row] [class*='meta'] {
   font-size: 12px;
 }
 
-body[data-dsh-maid-atelier] [data-maid-workspace-row][aria-expanded='true']:not([data-maid-workspace-active]) {
+body[data-dsh-maid-atelier] [data-maid-workspace-row]:not([data-maid-workspace-nested])[aria-expanded='true']:not(:has(> [class*='folderActive'])) {
   border-radius: 6px;
   background: linear-gradient(100deg, rgba(72, 98, 161, 0.32), rgba(25, 46, 95, 0.16));
   box-shadow:
@@ -2840,42 +2840,42 @@ body[data-dsh-maid-atelier] [data-maid-workspace-row][aria-expanded='true']:not(
   color: #f6e5c1;
 }
 
-body[data-dsh-maid-atelier] [data-maid-workspace-row][aria-expanded='true']:not([data-maid-workspace-active]):hover {
+body[data-dsh-maid-atelier] [data-maid-workspace-row]:not([data-maid-workspace-nested])[aria-expanded='true']:not(:has(> [class*='folderActive'])):hover {
   background: linear-gradient(100deg, rgba(83, 111, 178, 0.42), rgba(32, 55, 108, 0.24));
 }
 
-body[data-dsh-maid-atelier] [data-maid-workspace-active] {
+/* The host also highlights ancestors of the current workspace, including
+   collapsed branches. Read its folder state directly rather than inferring it
+   from whichever session rows are currently mounted. */
+body[data-dsh-maid-atelier] [data-maid-workspace-row]:has(> [class*='folderActive']) {
   isolation: isolate;
   color: #fff8e8;
   background: transparent;
   text-shadow: 0 1px 2px rgba(2, 8, 28, 0.54);
 }
 
-body[data-dsh-maid-atelier] [data-maid-workspace-active] > [class*='folder'] {
+body[data-dsh-maid-atelier] [data-maid-workspace-row]:has(> [class*='folderActive']) > [class*='folder'] {
   width: min(calc(var(--maid-workspace-row-height, 54px) - 2px), 30px);
   height: min(calc(var(--maid-workspace-row-height, 54px) - 2px), 38px);
   margin-block-start: 0;
 }
 
-body[data-dsh-maid-atelier] [data-maid-workspace-active] [class*='projectText'] {
+body[data-dsh-maid-atelier] [data-maid-workspace-row]:has(> [class*='folderActive']) [class*='projectText'] {
   margin-inline-start: -4px;
 }
 
-body[data-dsh-maid-atelier] [data-maid-workspace-active]:hover {
+body[data-dsh-maid-atelier] [data-maid-workspace-row]:has(> [class*='folderActive']):hover {
   background: transparent;
 }
 
 /* Scale the rolled edges with the banner; preserve the original 54px geometry. */
-body[data-dsh-maid-atelier] [data-maid-workspace-active]::before {
+body[data-dsh-maid-atelier] [data-maid-workspace-row]:not([data-maid-workspace-nested]):has(> [class*='folderActive'])::before {
   --maid-workspace-ribbon-box: calc(var(--maid-workspace-row-height, 54px) * 10 / 9);
   --maid-workspace-ribbon-overhang: calc((var(--maid-workspace-ribbon-box) - var(--maid-workspace-row-height, 54px)) / 2);
   content: '';
   position: absolute;
   box-sizing: border-box;
-  /* The rolled edge hangs 12px left of the row; a nested Workspace's banner
-     must start at its own indent step instead of reaching back over the
-     parent's gutter. */
-  inset: calc(-1 * var(--maid-workspace-ribbon-overhang)) 0 calc(-1 * var(--maid-workspace-ribbon-overhang)) calc(-12px + var(--dsh-workspace-indent, 0px));
+  inset: calc(-1 * var(--maid-workspace-ribbon-overhang)) 0 calc(-1 * var(--maid-workspace-ribbon-overhang)) -12px;
   z-index: 0;
   border-style: solid;
   border-width: 0 calc(var(--maid-workspace-ribbon-box) * 0.6) 0 calc(var(--maid-workspace-ribbon-box) * 7 / 12);
@@ -2899,9 +2899,92 @@ body[data-dsh-maid-atelier] [data-maid-workspace-active]::before {
    overlays, so their entrance fills `backwards` for the same reason as the
    session header above; the `::before` ribbon below owns no descendants and can
    keep `both`. */
-body[data-dsh-maid-atelier] [data-maid-workspace-active] > [class*='folder'],
-body[data-dsh-maid-atelier] [data-maid-workspace-active] [class*='projectText'] {
+body[data-dsh-maid-atelier] [data-maid-workspace-row]:not([data-maid-workspace-nested]):has(> [class*='folderActive']) > [class*='folder'],
+body[data-dsh-maid-atelier] [data-maid-workspace-row]:not([data-maid-workspace-nested]):has(> [class*='folderActive']) [class*='projectText'] {
   animation: maidAtelierWorkspaceRibbonContentEnter 260ms 90ms cubic-bezier(0.2, 0.74, 0.22, 1) backwards;
+}
+
+/* Nested workspaces keep the same inset plaque in every state, so their
+   background, crest and label all describe the same level of the native tree. */
+body[data-dsh-maid-atelier] [data-maid-workspace-row][data-maid-workspace-nested] {
+  min-height: 40px;
+  padding-block: 3px;
+}
+
+body[data-dsh-maid-atelier] [data-maid-workspace-row][data-maid-workspace-nested],
+body[data-dsh-maid-atelier] [data-maid-workspace-row][data-maid-workspace-nested]:hover {
+  background: transparent;
+  box-shadow: none;
+}
+
+body[data-dsh-maid-atelier] [data-maid-workspace-row][data-maid-workspace-nested] > [class*='folder'] {
+  width: 24px;
+  height: 28px;
+  margin-block-start: 0;
+  margin-inline-start: 0;
+}
+
+body[data-dsh-maid-atelier] [data-maid-workspace-nested] [class*='title'] {
+  font-size: 14px;
+}
+
+body[data-dsh-maid-atelier] [data-maid-workspace-nested]::before {
+  content: '';
+  position: absolute;
+  inset: 4px 2px 4px calc(2px + var(--dsh-workspace-indent, 0px));
+  z-index: 0;
+  border: 1px solid rgba(157, 176, 214, 0.34);
+  border-radius: 7px;
+  background: linear-gradient(90deg, rgba(62, 88, 148, 0.22), rgba(31, 52, 106, 0.12));
+  pointer-events: none;
+}
+
+body[data-dsh-maid-atelier] [data-maid-workspace-nested]:hover::before {
+  border-color: rgba(190, 203, 233, 0.55);
+  background: linear-gradient(90deg, rgba(82, 111, 174, 0.28), rgba(45, 71, 132, 0.18));
+}
+
+body[data-dsh-maid-atelier] [data-maid-workspace-nested]:has(> [class*='folderActive'])::before {
+  border-color: rgba(226, 190, 112, 0.72);
+  background: linear-gradient(90deg, rgba(82, 111, 184, 0.74), rgba(43, 70, 139, 0.62) 72%, rgba(20, 42, 94, 0.5));
+  box-shadow:
+    inset 0 1px rgba(255, 244, 215, 0.2),
+    inset 0 -1px rgba(7, 19, 55, 0.28),
+    0 3px 9px rgba(2, 8, 28, 0.3);
+}
+
+body[data-dsh-maid-atelier] [data-maid-workspace-nested]:has(> [class*='folderActive'])::after {
+  content: '';
+  position: absolute;
+  inset: 12px auto 12px calc(7px + var(--dsh-workspace-indent, 0px));
+  width: 3px;
+  border-radius: 999px;
+  corner-shape: round;
+  background: linear-gradient(#fff0c5, #d4a951);
+  box-shadow: 0 0 5px rgba(231, 199, 128, 0.72);
+  pointer-events: none;
+}
+
+body[data-dsh-maid-atelier] [data-maid-workspace-nested]:has(> [class*='folderActive']) [class*='projectText'] {
+  margin-inline-start: 0;
+}
+
+/* Bridge the child-workspace block to this group's own sessions below it.
+   Container height follows native expansion; no row reordering or measurement. */
+body[data-dsh-maid-atelier] [data-maid-workspace-sessions] > [role='group'] {
+  position: relative;
+}
+
+body[data-dsh-maid-atelier] [data-maid-workspace-sessions] > [role='group']::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  bottom: -2px;
+  left: calc(8px + var(--dsh-workspace-indent, 0px));
+  z-index: 0;
+  width: 1px;
+  background: repeating-linear-gradient(to bottom, rgba(224, 190, 120, 0.62) 0 3px, transparent 3px 7px);
+  pointer-events: none;
 }
 
 @keyframes maidAtelierWorkspaceRibbonEnter {

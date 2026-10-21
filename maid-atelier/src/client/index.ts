@@ -200,7 +200,8 @@ const PROJECTED_STATE_SELECTOR = [
 const WORKSPACE_FLAGS = [
   'data-maid-workspace-group',
   'data-maid-workspace-row',
-  'data-maid-workspace-active',
+  'data-maid-workspace-nested',
+  'data-maid-workspace-sessions',
   'data-maid-session-row',
   'data-maid-session-flat',
   'data-maid-session-first',
@@ -449,36 +450,34 @@ function decorateWorkspaceTree(decoratedElements: Set<HTMLElement>): void {
       return
     }
 
-    let workspaceRow: HTMLElement | undefined
-    let sessionRows: HTMLElement[] = []
-    const decorateGroup = (): void => {
-      if (!workspaceRow) return
-
-      claim(workspaceRow, 'data-maid-workspace-row')
-      if (workspaceRow.parentElement) {
-        claim(workspaceRow.parentElement, 'data-maid-workspace-group')
-      }
-      sessionRows.forEach((sessionRow) => {
-        claim(sessionRow, 'data-maid-session-row')
-      })
-      if (sessionRows[0]) claim(sessionRows[0], 'data-maid-session-first')
-      if (sessionRows.at(-1)) claim(sessionRows.at(-1)!, 'data-maid-session-last')
-
-      const containsCurrent = workspaceRow.getAttribute('aria-expanded') === 'true'
-        && sessionRows.some(sessionRow => sessionRow.getAttribute('aria-selected') === 'true')
-      if (containsCurrent) claim(workspaceRow, 'data-maid-workspace-active')
-    }
-
+    // Native groups render child workspaces before their own sessions, and
+    // Tooltip may wrap either kind of row. Resolve each row's nearest section
+    // instead of assigning sessions to the last workspace in flattened order.
+    const sessionsByGroup = new Map<HTMLElement, HTMLElement[]>()
     rows.forEach((row) => {
+      const group = row.closest<HTMLElement>("[class*='groupSection']")
       if (row.hasAttribute('aria-expanded')) {
-        decorateGroup()
-        workspaceRow = row
-        sessionRows = []
-      } else if (workspaceRow && row.hasAttribute('aria-selected')) {
-        sessionRows.push(row)
+        claim(row, 'data-maid-workspace-row')
+        if (group) {
+          claim(group, 'data-maid-workspace-group')
+          if (group.parentElement?.closest("[class*='groupSection']")) {
+            claim(row, 'data-maid-workspace-nested')
+          }
+        }
+      } else if (row.hasAttribute('aria-selected')) {
+        claim(row, 'data-maid-session-row')
+        if (group) {
+          const sessions = sessionsByGroup.get(group) ?? []
+          sessions.push(row)
+          sessionsByGroup.set(group, sessions)
+        }
       }
     })
-    decorateGroup()
+    for (const [group, sessionRows] of sessionsByGroup) {
+      claim(group, 'data-maid-workspace-sessions')
+      if (sessionRows[0]) claim(sessionRows[0], 'data-maid-session-first')
+      if (sessionRows.at(-1)) claim(sessionRows.at(-1)!, 'data-maid-session-last')
+    }
   })
 
   const touched = new Set<HTMLElement>([...current.keys(), ...desired.keys()])
@@ -594,7 +593,8 @@ export function apply(ctx: PanelContext): void {
       delete element.dataset.maidSidebarFooter
       delete element.dataset.maidWorkspaceGroup
       delete element.dataset.maidWorkspaceRow
-      delete element.dataset.maidWorkspaceActive
+      delete element.dataset.maidWorkspaceNested
+      delete element.dataset.maidWorkspaceSessions
       delete element.dataset.maidSessionRow
       delete element.dataset.maidSessionFlat
       delete element.dataset.maidSessionFirst

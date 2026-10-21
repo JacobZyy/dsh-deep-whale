@@ -574,38 +574,63 @@ describe('Maid Atelier skin apply', () => {
     expect(document.querySelector('[data-maid-sidebar-footer]')).toBeNull()
   })
 
-  it('marks the active workspace group and its session tree, then retracts every hook', async () => {
+  it('keeps parent sessions with their native group after nested workspaces, then retracts every hook', async () => {
     document.body.innerHTML = `
       <div class="AppFrame_sidebarCol">
         <div>
           <div role="tree">
-            <div role="treeitem" aria-expanded="false"><span class="fixture_folder"></span></div>
-            <div role="treeitem" aria-expanded="true"><span class="fixture_folder"></span></div>
-            <div role="treeitem" aria-selected="true"><span class="fixture_title">Current</span></div>
-            <div role="treeitem" aria-selected="false"><span class="fixture_title">Other</span></div>
+            <div class="fixture_groupSection" style="--dsh-workspace-indent: 0px">
+              <span><div role="treeitem" aria-expanded="true"><span class="fixture_folder fixture_folderActive"></span>Parent</div></span>
+              <div role="group">
+                <div class="fixture_groupSection" style="--dsh-workspace-indent: 12px">
+                  <span><div role="treeitem" aria-expanded="true"><span class="fixture_folder"></span>Child</div></span>
+                  <div role="treeitem" aria-selected="false"><span class="fixture_title">Child session</span></div>
+                </div>
+              </div>
+              <div role="treeitem" aria-selected="true"><span class="fixture_title">Current</span></div>
+              <span><div role="treeitem" aria-selected="false"><span class="fixture_title">Other</span></div></span>
+            </div>
           </div>
         </div>
       </div>
     `
     fiber = await mount()
 
-    const workspace = document.querySelectorAll<HTMLElement>("[role='treeitem'][aria-expanded]")[1]!
-    const group = workspace.parentElement!
-    const sessions = group.querySelectorAll<HTMLElement>("[role='treeitem'][aria-selected]")
+    const [workspace, child] = document.querySelectorAll<HTMLElement>("[role='treeitem'][aria-expanded]")
+    const group = workspace!.closest<HTMLElement>("[class*='groupSection']")!
+    const [childSession, current, other] = group.querySelectorAll<HTMLElement>("[role='treeitem'][aria-selected]")
     expect(group.hasAttribute('data-maid-workspace-group')).toBe(true)
-    expect(workspace.hasAttribute('data-maid-workspace-row')).toBe(true)
-    expect(workspace.hasAttribute('data-maid-workspace-active')).toBe(true)
-    expect([...sessions].every(session => session.hasAttribute('data-maid-session-row'))).toBe(true)
-    expect(sessions[0]!.hasAttribute('data-maid-session-first')).toBe(true)
-    expect(sessions[1]!.hasAttribute('data-maid-session-last')).toBe(true)
+    expect(group.hasAttribute('data-maid-workspace-sessions')).toBe(true)
+    expect(workspace!.hasAttribute('data-maid-workspace-row')).toBe(true)
+    expect(workspace!.hasAttribute('data-maid-workspace-nested')).toBe(false)
+    expect(child!.hasAttribute('data-maid-workspace-nested')).toBe(true)
+    expect(childSession!.hasAttribute('data-maid-session-first')).toBe(true)
+    expect(childSession!.hasAttribute('data-maid-session-last')).toBe(true)
+    expect(current!.hasAttribute('data-maid-session-first')).toBe(true)
+    expect(current!.hasAttribute('data-maid-session-last')).toBe(false)
+    expect(other!.hasAttribute('data-maid-session-first')).toBe(false)
+    expect(other!.hasAttribute('data-maid-session-last')).toBe(true)
+    expect([...group.querySelectorAll('[role="treeitem"]')].map(row => row.textContent))
+      .toEqual(['Parent', 'Child', 'Child session', 'Current', 'Other'])
 
-    sessions[0]!.setAttribute('aria-selected', 'false')
+    // Folder state can change without adding rows or changing aria-expanded.
+    // The root keeps its ribbon while the child switches to an active plaque.
+    child!.querySelector('span')!.classList.add('fixture_folderActive')
+    expect(declarations(workspace!, false)).toContain('border-image-source: var(--maid-workspace-ribbon-art)')
+    expect(declarations(child!, false)).not.toContain('border-image-source: var(--maid-workspace-ribbon-art)')
+    expect(declarations(child!, false)).toContain('rgba(226, 190, 112, 0.72)')
+
+    current!.remove()
+    other!.parentElement!.remove()
     await flushMutations()
-    expect(workspace.hasAttribute('data-maid-workspace-active')).toBe(false)
+    expect(group.hasAttribute('data-maid-workspace-sessions')).toBe(false)
+    expect(child!.closest('[data-maid-workspace-sessions]')).not.toBeNull()
 
     await fiber.dispose()
     expect(document.querySelector('[data-maid-workspace-group]')).toBeNull()
     expect(document.querySelector('[data-maid-workspace-row]')).toBeNull()
+    expect(document.querySelector('[data-maid-workspace-nested]')).toBeNull()
+    expect(document.querySelector('[data-maid-workspace-sessions]')).toBeNull()
     expect(document.querySelector('[data-maid-session-row]')).toBeNull()
     expect(document.querySelector('[data-maid-session-first]')).toBeNull()
     expect(document.querySelector('[data-maid-session-last]')).toBeNull()
@@ -2702,7 +2727,7 @@ describe('Maid Atelier skin apply', () => {
   })
 
   it('renders the active workspace as a crested ribbon with a connected session tree', () => {
-    const ribbonShapeRule = CSS.match(/\[data-maid-workspace-active\]::before\s*\{([^}]*)\}/s)?.[1] ?? ''
+    const ribbonShapeRule = CSS.match(/\[data-maid-workspace-row\]:not\(\[data-maid-workspace-nested\]\):has\(> \[class\*='folderActive'\]\)::before\s*\{([^}]*)\}/s)?.[1] ?? ''
     const shieldRule = CSS.match(
       /\[data-maid-workspace-row\] > \[class\*='folder'\]\s*\{([^}]*)\}/s,
     )?.[1] ?? ''
@@ -2732,14 +2757,14 @@ describe('Maid Atelier skin apply', () => {
     expect(workspaceRowRule).toContain('min-height: var(--maid-workspace-row-height, 54px)')
     expect(workspaceRowRule).toContain('padding: clamp(1px,')
     expect(shieldRule).toContain('height: min(calc(var(--maid-workspace-row-height, 54px) - 2px), 34px)')
-    expect(CSS).toMatch(/\[data-maid-workspace-active\] > \[class\*='folder'\]\s*\{/)
+    expect(CSS).toMatch(/\[data-maid-workspace-row\]:has\(> \[class\*='folderActive'\]\) > \[class\*='folder'\]\s*\{/)
     expect(ribbonShapeRule).toContain('border-image-source: var(--maid-workspace-ribbon-art)')
     expect(ribbonShapeRule).toContain('border-image-slice: 0 145 0 140 fill')
     // The band, its overhang, the side slices and the shadow all derive from the
     // row height, so the roll keeps the artwork's proportions at every height.
     expect(ribbonShapeRule).toContain('--maid-workspace-ribbon-box: calc(var(--maid-workspace-row-height, 54px) * 10 / 9)')
     expect(ribbonShapeRule).toContain('border-image-width: 0 calc(var(--maid-workspace-ribbon-box) * 0.6) 0 calc(var(--maid-workspace-ribbon-box) * 7 / 12)')
-    expect(ribbonShapeRule).toContain('inset: calc(-1 * var(--maid-workspace-ribbon-overhang)) 0 calc(-1 * var(--maid-workspace-ribbon-overhang)) calc(-12px + var(--dsh-workspace-indent, 0px))')
+    expect(ribbonShapeRule).toContain('inset: calc(-1 * var(--maid-workspace-ribbon-overhang)) 0 calc(-1 * var(--maid-workspace-ribbon-overhang)) -12px')
     expect(ribbonShapeRule).toContain('border-image-repeat: stretch')
     // One continuous reveal plus a separate settle: per-stop easing used to
     // stall the reveal at 70% before the swallowtail.
@@ -2788,7 +2813,7 @@ describe('Maid Atelier skin apply', () => {
     const plaqueRule = CSS.match(
       /\[data-maid-session-row\]:not\(\[data-maid-session-flat\]\)\[aria-selected='true'\]::after\s*\{([^}]*)\}/s,
     )?.[1] ?? ''
-    const ribbonRule = CSS.match(/\[data-maid-workspace-active\]::before\s*\{([^}]*)\}/s)?.[1] ?? ''
+    const ribbonRule = CSS.match(/\[data-maid-workspace-row\]:not\(\[data-maid-workspace-nested\]\):has\(> \[class\*='folderActive'\]\)::before\s*\{([^}]*)\}/s)?.[1] ?? ''
     const indent = 'var(--dsh-workspace-indent, 0px)'
     expect(workspaceRowRule).toContain(`padding-inline-start: calc(10px + ${indent})`)
     expect(sessionRowRule).toContain(`padding-inline-start: calc(24px + ${indent})`)
@@ -2796,7 +2821,7 @@ describe('Maid Atelier skin apply', () => {
     expect(sessionBranchRule).toContain(`left: calc(8px + ${indent})`)
     expect(sessionRuleRule).toContain(`left: calc(28px + ${indent})`)
     expect(plaqueRule).toContain(`inset: 0 0 0 calc(18px + ${indent})`)
-    expect(ribbonRule).toContain(`calc(-12px + ${indent})`)
+    expect(ribbonRule).toContain('inset: calc(-1 * var(--maid-workspace-ribbon-overhang)) 0 calc(-1 * var(--maid-workspace-ribbon-overhang)) -12px')
     // The flat list is not a tree: it must keep its own even gutter instead of
     // inheriting a leftover indent step from an enclosing group section.
     const flatRule = CSS.match(/\[data-maid-session-flat\]\s*\{([^}]*)\}/s)?.[1] ?? ''
@@ -2990,7 +3015,7 @@ describe('Maid Atelier skin apply', () => {
     expect(workspaceHeaderKeyframes).not.toContain('padding-bottom:')
     expect(reducedMotionRule).toContain('transition: none')
     expect(reducedMotionRule).toContain('animation: none')
-    expect(reducedMotionRule).toContain('[data-maid-workspace-active]::before')
+    expect(reducedMotionRule).toContain("[data-maid-workspace-row]:has(> [class*='folderActive'])::before")
     expect(reducedMotionRule).toContain('[data-maid-table-frame]')
     expect(reducedMotionRule).toContain('[data-maid-table-expand]')
   })
