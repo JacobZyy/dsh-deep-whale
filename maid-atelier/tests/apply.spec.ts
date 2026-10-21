@@ -1101,11 +1101,11 @@ describe('Maid Atelier skin apply', () => {
     expect(frameRule).toContain('var(--maid-composer-ribbon-right-fill-art)')
     expect(frameRule).toContain('var(--maid-composer-ribbon-right-cap-art)')
     expect(frameRule).not.toContain('var(--maid-composer-lace-art)')
-    expect(frameRule).toContain('left 54px top')
-    expect(frameRule).toContain('right 54px top')
-    expect(frameRule).toContain('left 156px top')
-    expect(frameRule).toContain('right 156px top')
-    expect(frameRule).toContain('max(0px, calc(50% - 186px)) 32px')
+    expect(frameRule).toContain('left 53px top')
+    expect(frameRule).toContain('right 53px top')
+    expect(frameRule).toContain('left 154px top')
+    expect(frameRule).toContain('right 154px top')
+    expect(frameRule).toContain('max(0px, calc(50% - 184px)) 32px')
     expect(frameRule).toContain('background-repeat: no-repeat')
     expect(frameRule).toContain('border-width: 72px 54px 52px')
     expect(frameRule).toContain('border-image-source: var(--maid-composer-frame-art)')
@@ -1114,13 +1114,13 @@ describe('Maid Atelier skin apply', () => {
     expect(frameRule).toContain('border-image-repeat: stretch')
     expect(frameRule).not.toContain('100% 100%')
     expect(CSS).toMatch(
-      /\[data-skin-chrome='composer-lace'\]::before\s*\{[^}]*left: 54px[^}]*var\(--maid-composer-lace-art\)[^}]*background-position: left top/s,
+      /\[data-skin-chrome='composer-lace'\]::before\s*\{[^}]*left: 53px[^}]*var\(--maid-composer-lace-art\)[^}]*background-position: left -4px top/s,
     )
     expect(CSS).toMatch(
-      /\[data-skin-chrome='composer-lace'\]::after\s*\{[^}]*right: 54px[^}]*var\(--maid-composer-lace-art\)[^}]*background-position: right top/s,
+      /\[data-skin-chrome='composer-lace'\]::after\s*\{[^}]*right: 53px[^}]*var\(--maid-composer-lace-art\)[^}]*background-position: right 1px top/s,
     )
     expect(CSS).toMatch(
-      /\[data-skin-chrome='composer-lace'\]::before,[\s\S]*?\[data-skin-chrome='composer-lace'\]::after\s*\{[^}]*width: max\(0px, calc\(50% - 81px\)\)/s,
+      /\[data-skin-chrome='composer-lace'\]::before,[\s\S]*?\[data-skin-chrome='composer-lace'\]::after\s*\{[^}]*width: max\(0px, calc\(50% - 80px\)\)/s,
     )
     expect(CSS).toMatch(
       /\[data-maid-composer-lace-center\]\s*\{[^}]*left: calc\(50% - 27px\)[^}]*width: 54px[^}]*var\(--maid-composer-lace-art\)[^}]*background-position: center top[^}]*background-repeat: no-repeat/s,
