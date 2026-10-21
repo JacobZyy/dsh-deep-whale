@@ -3785,8 +3785,8 @@ body[data-dsh-maid-atelier] [data-composer-card]::before {
   /* The frame stays above the backing plate, but below the live controls and
      their in-place menus. A higher layer traps both selectors under the bow. */
   z-index: 1;
-  /* The shell keeps the fixed corner lace. Rebuild only its transparent center
-     from ribbon slices; the clipped lace strips below join under the bow. */
+  /* Overlap ribbon joins by 1px: fractional display scaling snaps border-image
+     corners separately from backgrounds. Keep the cap sizes and bow gap fixed. */
   background-image:
     var(--maid-bow-art),
     var(--maid-composer-ribbon-left-cap-art),
@@ -3795,16 +3795,16 @@ body[data-dsh-maid-atelier] [data-composer-card]::before {
     var(--maid-composer-ribbon-right-fill-art);
   background-position:
     center top,
-    left 54px top,
-    right 54px top,
-    left 156px top,
-    right 156px top;
+    left 53px top,
+    right 53px top,
+    left 154px top,
+    right 154px top;
   background-size:
     auto 69px,
     102px 32px,
     102px 32px,
-    max(0px, calc(50% - 186px)) 32px,
-    max(0px, calc(50% - 186px)) 32px;
+    max(0px, calc(50% - 184px)) 32px,
+    max(0px, calc(50% - 184px)) 32px;
   background-repeat: no-repeat;
   background-origin: border-box;
   background-clip: border-box;
@@ -3892,7 +3892,8 @@ body[data-dsh-maid-atelier] [data-composer-card] > * {
 
 /* The 123:75 source tile becomes one 54x33px unit. Keep exactly one unit on the
    card centre; its joins at +/-27px sit under opaque parts of the bow, while
-   the outer strips keep the source phase of their adjacent fixed corners. */
+   the outer strips overlap the fixed corners by 1px. Match each corner's lace
+   contour: the left slice ends farther down a scallop than the right slice. */
 body[data-dsh-maid-atelier]
   [data-composer-card]
   > [data-skin-chrome='composer-lace'] {
@@ -3927,23 +3928,23 @@ body[data-dsh-maid-atelier]
 body[data-dsh-maid-atelier]
   [data-composer-card]
   > [data-skin-chrome='composer-lace']::after {
-  width: max(0px, calc(50% - 81px));
+  width: max(0px, calc(50% - 80px));
 }
 
 body[data-dsh-maid-atelier]
   [data-composer-card]
   > [data-skin-chrome='composer-lace']::before {
-  left: 54px;
+  left: 53px;
   background-image: var(--maid-composer-lace-art);
-  background-position: left top;
+  background-position: left -4px top;
 }
 
 body[data-dsh-maid-atelier]
   [data-composer-card]
   > [data-skin-chrome='composer-lace']::after {
-  right: 54px;
+  right: 53px;
   background-image: var(--maid-composer-lace-art);
-  background-position: right top;
+  background-position: right 1px top;
 }
 
 body[data-dsh-maid-atelier]
@@ -4365,16 +4366,16 @@ body[data-dsh-maid-atelier] [data-composer-card]
   body[data-dsh-maid-atelier] [data-composer-card]::before {
     background-position:
       center top 4px,
-      left 54px top 8px,
-      right 54px top 8px,
-      left 118px top 8px,
-      right 118px top 8px;
+      left 53px top 8px,
+      right 53px top 8px,
+      left 116px top 8px,
+      right 116px top 8px;
     background-size:
       auto 54px,
       64px 20px,
       64px 20px,
-      max(0px, calc(50% - 148px)) 20px,
-      max(0px, calc(50% - 148px)) 20px;
+      max(0px, calc(50% - 146px)) 20px,
+      max(0px, calc(50% - 146px)) 20px;
   }
 
   /* The compact ribbon ends at the card's +8px edge, while the desktop lace
@@ -4391,6 +4392,14 @@ body[data-dsh-maid-atelier] [data-composer-card]
     > [data-skin-chrome='composer-lace']
     > [data-maid-composer-lace-center] {
     top: 28px;
+  }
+
+  /* The compact strip sits 2px higher; advance its left scallop to meet the
+     unchanged corner contour at the same height. */
+  body[data-dsh-maid-atelier]
+    [data-composer-card]
+    > [data-skin-chrome='composer-lace']::before {
+    background-position: left -6px top;
   }
 
   body[data-dsh-maid-atelier] :is([data-phase='hero'], [data-phase='active'])
