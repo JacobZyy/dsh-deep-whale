@@ -2768,11 +2768,18 @@ body[data-dsh-maid-atelier] [data-slot='sidebar.workspaces'] ::-webkit-scrollbar
 
 /* Let older hosts keep their subtitle without clipping at compact heights. */
 body[data-dsh-maid-atelier] [data-maid-workspace-row] {
+  /* The host writes one indent step per nesting level onto the group section
+     (`--dsh-workspace-indent: depth * 12px`) and its own rows read it back in
+     `padding-inline-start`. The skin's padding shorthand below resets that
+     longhand, so "group by workspace tree" rendered every level flush left.
+     Restate the host's step against the skin's own inline padding; the 0px
+     fallback keeps hosts that predate the variable on today's flat geometry. */
   isolation: isolate;
   position: relative;
   height: auto;
   min-height: var(--maid-workspace-row-height, 54px);
   padding: clamp(1px, calc((var(--maid-workspace-row-height, 54px) - 22px) * 0.1875 + 1px), 7px) 10px clamp(1px, calc((var(--maid-workspace-row-height, 54px) - 22px) * 0.1875 + 1px), 7px);
+  padding-inline-start: calc(10px + var(--dsh-workspace-indent, 0px));
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -2865,7 +2872,10 @@ body[data-dsh-maid-atelier] [data-maid-workspace-active]::before {
   content: '';
   position: absolute;
   box-sizing: border-box;
-  inset: calc(-1 * var(--maid-workspace-ribbon-overhang)) 0 calc(-1 * var(--maid-workspace-ribbon-overhang)) -12px;
+  /* The rolled edge hangs 12px left of the row; a nested Workspace's banner
+     must start at its own indent step instead of reaching back over the
+     parent's gutter. */
+  inset: calc(-1 * var(--maid-workspace-ribbon-overhang)) 0 calc(-1 * var(--maid-workspace-ribbon-overhang)) calc(-12px + var(--dsh-workspace-indent, 0px));
   z-index: 0;
   border-style: solid;
   border-width: 0 calc(var(--maid-workspace-ribbon-box) * 0.6) 0 calc(var(--maid-workspace-ribbon-box) * 7 / 12);
@@ -2935,6 +2945,10 @@ body[data-dsh-maid-atelier] [data-maid-session-row] {
   min-width: 0;
   height: 32px;
   padding: 0 8px 0 24px;
+  /* Session rows sit in the same group section as their Workspace, so the
+     host's per-depth step must move the whole branch — padding, status dot,
+     rail and trailing rule — not just the label. */
+  padding-inline-start: calc(24px + var(--dsh-workspace-indent, 0px));
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -2965,7 +2979,7 @@ body[data-dsh-maid-atelier] [data-maid-session-row]:hover:not([aria-selected='tr
 
 body[data-dsh-maid-atelier] [data-maid-session-row] > [class*='slot'] {
   position: absolute;
-  left: 6px;
+  left: calc(6px + var(--dsh-workspace-indent, 0px));
   z-index: 2;
 }
 
@@ -3013,7 +3027,7 @@ body[data-dsh-maid-atelier] [data-maid-session-row]::before {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: 8px;
+  left: calc(8px + var(--dsh-workspace-indent, 0px));
   z-index: 1;
   width: 10px;
   background:
@@ -3049,7 +3063,7 @@ body[data-dsh-maid-atelier] [data-maid-session-row]:not(:last-child)::after {
   position: absolute;
   right: 8px;
   bottom: 0;
-  left: 28px;
+  left: calc(28px + var(--dsh-workspace-indent, 0px));
   height: 1px;
   background: rgba(183, 196, 226, 0.32);
   pointer-events: none;
@@ -3059,7 +3073,9 @@ body[data-dsh-maid-atelier]
   [data-maid-session-row]:not([data-maid-session-flat])[aria-selected='true']::after {
   content: '';
   position: absolute;
-  inset: 0 0 0 18px;
+  /* Absolute insets resolve against the row box, not its padding, so the
+     plaque carries the indent step explicitly. */
+  inset: 0 0 0 calc(18px + var(--dsh-workspace-indent, 0px));
   z-index: 0;
   width: auto;
   height: auto;

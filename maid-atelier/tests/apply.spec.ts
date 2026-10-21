@@ -2739,7 +2739,7 @@ describe('Maid Atelier skin apply', () => {
     // row height, so the roll keeps the artwork's proportions at every height.
     expect(ribbonShapeRule).toContain('--maid-workspace-ribbon-box: calc(var(--maid-workspace-row-height, 54px) * 10 / 9)')
     expect(ribbonShapeRule).toContain('border-image-width: 0 calc(var(--maid-workspace-ribbon-box) * 0.6) 0 calc(var(--maid-workspace-ribbon-box) * 7 / 12)')
-    expect(ribbonShapeRule).toContain('inset: calc(-1 * var(--maid-workspace-ribbon-overhang)) 0 calc(-1 * var(--maid-workspace-ribbon-overhang)) -12px')
+    expect(ribbonShapeRule).toContain('inset: calc(-1 * var(--maid-workspace-ribbon-overhang)) 0 calc(-1 * var(--maid-workspace-ribbon-overhang)) calc(-12px + var(--dsh-workspace-indent, 0px))')
     expect(ribbonShapeRule).toContain('border-image-repeat: stretch')
     // One continuous reveal plus a separate settle: per-stop easing used to
     // stall the reveal at 70% before the swallowtail.
@@ -2757,14 +2757,50 @@ describe('Maid Atelier skin apply', () => {
     expect(sessionRowRule).toContain('min-width: 0')
     expect(selectedSessionRule).toContain('background: transparent')
     expect(selectedSessionRule).toContain('color: #fff8e8')
-    expect(selectedSessionPlaqueRule).toContain('inset: 0 0 0 18px')
+    expect(selectedSessionPlaqueRule).toContain('inset: 0 0 0 calc(18px + var(--dsh-workspace-indent, 0px))')
     expect(selectedSessionPlaqueRule).toContain('border-radius: 8px')
     expect(selectedSessionPlaqueRule).toContain('rgba(226, 190, 112, 0.72)')
     expect(selectedSessionPlaqueRule).toContain('rgba(82, 111, 184, 0.74)')
     expect(sessionBranchRule).toContain('repeating-linear-gradient')
-    expect(sessionBranchRule).toContain('left: 8px')
+    expect(sessionBranchRule).toContain('left: calc(8px + var(--dsh-workspace-indent, 0px))')
     expect(sessionBranchRule).toContain('width: 10px')
     expect(CSS).toMatch(/\[data-maid-session-last\]::before\s*\{[^}]*1px 50% no-repeat/s)
+  })
+
+  // Issue #211: the host indents "group by workspace tree" levels with a
+  // per-group `--dsh-workspace-indent: depth * 12px` inline variable and reads
+  // it in `padding-inline-start`. The skin's padding shorthand reset that
+  // longhand, so every level rendered flush left. Each skin-owned offset that
+  // paints against the row box must carry the same step, and the 0px fallback
+  // keeps hosts that predate the variable on the old flat geometry.
+  it('follows the host workspace-tree indent for nested groups', () => {
+    const workspaceRowRule = CSS.match(/\[data-maid-workspace-row\]\s*\{([^}]*)\}/s)?.[1] ?? ''
+    const sessionRowRule = CSS.match(/\[data-maid-session-row\]\s*\{([^}]*)\}/s)?.[1] ?? ''
+    const sessionSlotRule = CSS.match(
+      /\[data-maid-session-row\] > \[class\*='slot'\]\s*\{([^}]*)\}/s,
+    )?.[1] ?? ''
+    const sessionBranchRule = CSS.match(
+      /\[data-maid-session-row\]::before\s*\{([^}]*)\}/s,
+    )?.[1] ?? ''
+    const sessionRuleRule = CSS.match(
+      /\[data-maid-session-row\]:not\(:last-child\)::after\s*\{([^}]*)\}/s,
+    )?.[1] ?? ''
+    const plaqueRule = CSS.match(
+      /\[data-maid-session-row\]:not\(\[data-maid-session-flat\]\)\[aria-selected='true'\]::after\s*\{([^}]*)\}/s,
+    )?.[1] ?? ''
+    const ribbonRule = CSS.match(/\[data-maid-workspace-active\]::before\s*\{([^}]*)\}/s)?.[1] ?? ''
+    const indent = 'var(--dsh-workspace-indent, 0px)'
+    expect(workspaceRowRule).toContain(`padding-inline-start: calc(10px + ${indent})`)
+    expect(sessionRowRule).toContain(`padding-inline-start: calc(24px + ${indent})`)
+    expect(sessionSlotRule).toContain(`left: calc(6px + ${indent})`)
+    expect(sessionBranchRule).toContain(`left: calc(8px + ${indent})`)
+    expect(sessionRuleRule).toContain(`left: calc(28px + ${indent})`)
+    expect(plaqueRule).toContain(`inset: 0 0 0 calc(18px + ${indent})`)
+    expect(ribbonRule).toContain(`calc(-12px + ${indent})`)
+    // The flat list is not a tree: it must keep its own even gutter instead of
+    // inheriting a leftover indent step from an enclosing group section.
+    const flatRule = CSS.match(/\[data-maid-session-flat\]\s*\{([^}]*)\}/s)?.[1] ?? ''
+    expect(flatRule).toContain('padding-inline: 26px 9px')
   })
 
   it('renders the selected flat-list Session as a complete gold-edged plaque', () => {
