@@ -2361,6 +2361,7 @@ body[data-dsh-orca-link][data-ds-dark-theme] [data-slot='sidebar'] [role='tree']
 }
 
 body[data-dsh-orca-link] [data-slot='sidebar'] [role='tree'] > div[data-orca-workspace-group] {
+  --orca-workspace-end-gap: 5px;
   position: relative;
   padding: 3px 0 5px;
 }
@@ -2371,33 +2372,54 @@ body[data-dsh-orca-link] [data-slot='sidebar'] [role='tree'] > div[data-orca-wor
   border-top: 1px solid color-mix(in srgb, var(--orca-tree-guide) 72%, transparent);
 }
 
-body[data-dsh-orca-link] [data-slot='sidebar'] [role='tree'] > div[data-orca-workspace-selectable]::before {
+body[data-dsh-orca-link] [data-slot='sidebar'] [data-orca-workspace-group] {
+  --orca-workspace-indent: calc(var(--dsh-workspace-indent, 0px) * 1.5);
+  --orca-workspace-end-gap: 0px;
+  position: relative;
+}
+
+/* Each section owns its branch and its own sessions, even after nested groups. */
+body[data-dsh-orca-link] [data-slot='sidebar'] [data-orca-workspace-children]::before,
+body[data-dsh-orca-link] [data-slot='sidebar'] [data-orca-workspace-selectable]::before {
   position: absolute;
-  z-index: 0;
   top: 41px;
-  bottom: 7px;
-  left: 11px;
+  bottom: 19px;
+  left: calc(var(--orca-workspace-indent) + 11px);
   width: 1px;
   content: '';
   background: var(--orca-tree-guide);
   pointer-events: none;
 }
 
+body[data-dsh-orca-link] [data-slot='sidebar'] [data-orca-workspace-selectable]::before {
+  bottom: calc(16px + var(--orca-workspace-end-gap));
+}
+
+/* The solid guide ends at the last session; the overflow button continues it. */
+body[data-dsh-orca-link] [data-slot='sidebar'] [data-orca-workspace-overflow]::before {
+  bottom: calc(44px + var(--orca-workspace-end-gap));
+}
+
 body[data-dsh-orca-link] [data-slot='sidebar'] [role='treeitem'] {
   text-shadow: none;
 }
 
-/* Workspace chapter row: collapse the stock two-line 54px cell into a quiet
-   single-line index row while retaining its folder, count, menus, and toggle. */
+/* Move the complete row so backgrounds and controls share the same indent. */
 body[data-dsh-orca-link] [data-slot='sidebar'] [role='treeitem'][aria-expanded] {
   position: relative;
   box-sizing: border-box;
   height: 38px;
   min-height: 38px;
+  width: calc(100% - var(--orca-workspace-indent, 0px));
+  margin-left: var(--orca-workspace-indent, 0px);
   padding: 0 8px;
   align-items: center;
   border-radius: 0;
   background: transparent;
+}
+
+body[data-dsh-orca-link] [data-slot='sidebar'] [role='treeitem'][aria-expanded] > [class*='slot'] {
+  left: auto;
 }
 
 body[data-dsh-orca-link] [data-slot='sidebar'] [role='treeitem'][aria-expanded]::before {
@@ -2484,9 +2506,7 @@ body[data-dsh-orca-link] [data-slot='sidebar'] [role='treeitem'][aria-expanded]:
   background: color-mix(in srgb, var(--orca-blue) 5.5%, transparent);
 }
 
-body[data-dsh-orca-link] [data-slot='sidebar'] [role='tree']
-  > div[data-orca-workspace-current]
-  [role='treeitem'][aria-expanded] {
+body[data-dsh-orca-link] [data-slot='sidebar'] [role='treeitem'][aria-expanded]:has(> [class*='folderActive']) {
   border-left-color: var(--orca-blue);
   background: linear-gradient(90deg, color-mix(in srgb, var(--orca-blue) 15%, transparent), color-mix(in srgb, var(--orca-blue) 3.5%, transparent) 72%, transparent);
   box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--orca-blue) 20%, transparent);
@@ -2495,16 +2515,12 @@ body[data-dsh-orca-link] [data-slot='sidebar'] [role='tree']
 /* Folder geometry communicates open/closed; blue communicates the current
    workspace. The small square is deliberately independent from the open
    folder glyph, so an expanded inactive workspace cannot read as selected. */
-body[data-dsh-orca-link] [data-slot='sidebar'] [role='tree']
-  > div[data-orca-workspace-current]
-  [role='treeitem'][aria-expanded]::before {
+body[data-dsh-orca-link] [data-slot='sidebar'] [role='treeitem'][aria-expanded]:has(> [class*='folderActive'])::before {
   background: var(--orca-blue);
   box-shadow: 3px 0 0 color-mix(in srgb, var(--orca-blue) 20%, transparent);
 }
 
-body[data-dsh-orca-link] [data-slot='sidebar'] [role='tree']
-  > div[data-orca-workspace-current]
-  [role='treeitem'][aria-expanded]::after {
+body[data-dsh-orca-link] [data-slot='sidebar'] [role='treeitem'][aria-expanded]:has(> [class*='folderActive'])::after {
   position: absolute;
   top: 16px;
   left: -1px;
@@ -2516,9 +2532,7 @@ body[data-dsh-orca-link] [data-slot='sidebar'] [role='tree']
   pointer-events: none;
 }
 
-body[data-dsh-orca-link] [data-slot='sidebar'] [role='tree']
-  > div[data-orca-workspace-current]
-  [role='treeitem'][aria-expanded]
+body[data-dsh-orca-link] [data-slot='sidebar'] [role='treeitem'][aria-expanded]:has(> [class*='folderActive'])
   svg[data-orca-link-icon^='folder-'] {
   color: var(--orca-blue);
 }
@@ -2529,9 +2543,9 @@ body[data-dsh-orca-link] [data-slot='sidebar'] div[role='treeitem'][aria-selecte
   position: relative;
   z-index: 1;
   box-sizing: border-box;
-  width: calc(100% - 18px);
+  width: calc(100% - 18px - var(--orca-workspace-indent, 0px));
   height: 34px;
-  margin-left: 18px;
+  margin-left: calc(18px + var(--orca-workspace-indent, 0px));
   padding: 0 7px 0 9px;
   border-radius: 0;
   background: transparent;
@@ -2590,9 +2604,7 @@ body[data-dsh-orca-link][data-ds-dark-theme] [data-slot='sidebar'] [role='treeit
   background: rgba(77, 145, 255, 0.09);
 }
 
-body[data-dsh-orca-link][data-ds-dark-theme] [data-slot='sidebar'] [role='tree']
-  > div[data-orca-workspace-current]
-  [role='treeitem'][aria-expanded] {
+body[data-dsh-orca-link][data-ds-dark-theme] [data-slot='sidebar'] [role='treeitem'][aria-expanded]:has(> [class*='folderActive']) {
   background: linear-gradient(90deg, rgba(77, 145, 255, 0.2), rgba(77, 145, 255, 0.06) 72%, transparent);
 }
 
@@ -2602,6 +2614,73 @@ body[data-dsh-orca-link][data-ds-dark-theme] [data-slot='sidebar'] div[role='tre
 
 body[data-dsh-orca-link][data-ds-dark-theme] [data-slot='sidebar'] div[role='treeitem'][aria-selected='true'] {
   background: rgba(77, 145, 255, 0.16);
+}
+
+/* Child folders use a single connector and a quiet active surface. */
+body[data-dsh-orca-link] [data-slot='sidebar'] [role='group'] [data-orca-workspace-group]::before {
+  top: 34px;
+}
+
+body[data-dsh-orca-link] [data-slot='sidebar'] [role='group'] [role='treeitem'][aria-expanded] {
+  height: 34px;
+  min-height: 34px;
+  border-left: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+body[data-dsh-orca-link] [data-slot='sidebar'] [role='group'] [role='treeitem'][aria-expanded]::before {
+  top: 17px;
+  bottom: auto;
+  left: -7px;
+  width: 7px;
+  height: 1px;
+  border: 0;
+  transform: none;
+  background: var(--orca-tree-guide);
+  box-shadow: none;
+}
+
+body[data-dsh-orca-link] [data-slot='sidebar'] [role='group'] [role='treeitem'][aria-expanded]::after {
+  content: none;
+}
+
+body[data-dsh-orca-link] [data-slot='sidebar'] [role='group'] [role='treeitem'][aria-expanded]:has(> [class*='folderActive']) {
+  background: color-mix(in srgb, var(--orca-blue) 7%, transparent);
+  color: var(--orca-ink);
+}
+
+body[data-dsh-orca-link] [data-slot='sidebar'] [role='group'] [role='treeitem'][aria-expanded]
+  > span:nth-child(3) > span:first-child {
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+body[data-dsh-orca-link] [data-slot='sidebar'] [role='group'] [role='treeitem'][aria-expanded]:hover {
+  background: color-mix(in srgb, var(--orca-blue) 10%, transparent);
+}
+
+body[data-dsh-orca-link] [data-slot='sidebar'] [class*='sessionOverflowButton'] {
+  width: calc(100% - var(--orca-workspace-indent, 0px));
+  margin-left: var(--orca-workspace-indent, 0px);
+  padding-inline-start: 28px;
+}
+
+body[data-dsh-orca-link] [data-slot='sidebar'] [data-orca-workspace-overflow] > button[class*='sessionOverflowButton'] {
+  position: relative;
+}
+
+body[data-dsh-orca-link] [data-slot='sidebar'] [data-orca-workspace-overflow] > button[class*='sessionOverflowButton']::before {
+  position: absolute;
+  box-sizing: border-box;
+  top: -16px;
+  bottom: calc(50% - 1px);
+  left: 11px;
+  width: 7px;
+  content: '';
+  border-left: 1px dashed var(--orca-tree-guide);
+  border-bottom: 1px solid var(--orca-tree-guide);
+  pointer-events: none;
 }
 
 body[data-dsh-orca-link]
