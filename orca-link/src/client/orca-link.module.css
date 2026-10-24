@@ -2841,7 +2841,8 @@ body[data-dsh-orca-link] [data-question-key] [class*='_checkbox']::before {
    paint ORCA's straight-line set on the glyph box itself, keyed on the host's
    status attribute: corner brackets while pending, a ticked frame when done,
    and in progress the context-usage pixel field, whose cells fill bottom-up
-   on a stepped 2.4s cycle (one 16px pseudo-element, clip-path steps only). */
+   on a stepped 1.6s cycle, then clear bottom-up one row at a time (one
+   16px pseudo-element, clip-path steps only). */
 body[data-dsh-orca-link] [data-testid='todo-panel'] li[data-status] > [class*='_glyph'] {
   position: relative;
   color: var(--dsw-alias-label-tertiary);
@@ -2886,22 +2887,23 @@ body[data-dsh-orca-link] [data-testid='todo-panel'] li[data-status='in_progress'
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='square' stroke-linejoin='miter'%3E%3Crect x='4' y='10' width='2' height='2' fill='black' stroke='none'/%3E%3Crect x='7' y='10' width='2' height='2' fill='black' stroke='none'/%3E%3Crect x='10' y='10' width='2' height='2' fill='black' stroke='none'/%3E%3Crect x='4' y='7' width='2' height='2' fill='black' stroke='none'/%3E%3Crect x='7' y='7' width='2' height='2' fill='black' stroke='none'/%3E%3Crect x='10' y='7' width='2' height='2' fill='black' stroke='none'/%3E%3Crect x='4' y='4' width='2' height='2' fill='black' stroke='none'/%3E%3Crect x='7' y='4' width='2' height='2' fill='black' stroke='none'/%3E%3Crect x='10' y='4' width='2' height='2' fill='black' stroke='none'/%3E%3C/svg%3E") center / 16px 16px no-repeat;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='square' stroke-linejoin='miter'%3E%3Crect x='4' y='10' width='2' height='2' fill='black' stroke='none'/%3E%3Crect x='7' y='10' width='2' height='2' fill='black' stroke='none'/%3E%3Crect x='10' y='10' width='2' height='2' fill='black' stroke='none'/%3E%3Crect x='4' y='7' width='2' height='2' fill='black' stroke='none'/%3E%3Crect x='7' y='7' width='2' height='2' fill='black' stroke='none'/%3E%3Crect x='10' y='7' width='2' height='2' fill='black' stroke='none'/%3E%3Crect x='4' y='4' width='2' height='2' fill='black' stroke='none'/%3E%3Crect x='7' y='4' width='2' height='2' fill='black' stroke='none'/%3E%3Crect x='10' y='4' width='2' height='2' fill='black' stroke='none'/%3E%3C/svg%3E") center / 16px 16px no-repeat;
   clip-path: polygon(3.5px 12.5px, 12.5px 12.5px, 12.5px 12.5px, 3.5px 12.5px, 3.5px 9.5px, 3.5px 9.5px);
-  animation: orcaTodoFill 2.4s step-end infinite;
+  animation: orcaTodoFill 1.6s step-end infinite;
 }
 
 @keyframes orcaTodoFill {
   0% { clip-path: polygon(3.5px 12.5px, 12.5px 12.5px, 12.5px 12.5px, 3.5px 12.5px, 3.5px 9.5px, 3.5px 9.5px); }
-  8% { clip-path: polygon(3.5px 12.5px, 12.5px 12.5px, 12.5px 12.5px, 6.5px 12.5px, 6.5px 9.5px, 3.5px 9.5px); }
-  16% { clip-path: polygon(3.5px 12.5px, 12.5px 12.5px, 12.5px 12.5px, 9.5px 12.5px, 9.5px 9.5px, 3.5px 9.5px); }
-  24% { clip-path: polygon(3.5px 12.5px, 12.5px 12.5px, 12.5px 9.5px, 3.5px 9.5px, 3.5px 6.5px, 3.5px 6.5px); }
-  32% { clip-path: polygon(3.5px 12.5px, 12.5px 12.5px, 12.5px 9.5px, 6.5px 9.5px, 6.5px 6.5px, 3.5px 6.5px); }
-  40% { clip-path: polygon(3.5px 12.5px, 12.5px 12.5px, 12.5px 9.5px, 9.5px 9.5px, 9.5px 6.5px, 3.5px 6.5px); }
-  48% { clip-path: polygon(3.5px 12.5px, 12.5px 12.5px, 12.5px 6.5px, 3.5px 6.5px, 3.5px 3.5px, 3.5px 3.5px); }
-  56% { clip-path: polygon(3.5px 12.5px, 12.5px 12.5px, 12.5px 6.5px, 6.5px 6.5px, 6.5px 3.5px, 3.5px 3.5px); }
-  64% { clip-path: polygon(3.5px 12.5px, 12.5px 12.5px, 12.5px 6.5px, 9.5px 6.5px, 9.5px 3.5px, 3.5px 3.5px); }
-  72% { clip-path: polygon(3.5px 12.5px, 12.5px 12.5px, 12.5px 3.5px, 3.5px 3.5px, 3.5px 0.5px, 3.5px 0.5px); }
-  90% { clip-path: polygon(3.5px 12.5px, 12.5px 12.5px, 12.5px 12.5px, 3.5px 12.5px, 3.5px 9.5px, 3.5px 9.5px); }
-  100% { clip-path: polygon(3.5px 12.5px, 12.5px 12.5px, 12.5px 12.5px, 3.5px 12.5px, 3.5px 9.5px, 3.5px 9.5px); }
+  7% { clip-path: polygon(3.5px 12.5px, 12.5px 12.5px, 12.5px 12.5px, 6.5px 12.5px, 6.5px 9.5px, 3.5px 9.5px); }
+  14% { clip-path: polygon(3.5px 12.5px, 12.5px 12.5px, 12.5px 12.5px, 9.5px 12.5px, 9.5px 9.5px, 3.5px 9.5px); }
+  21% { clip-path: polygon(3.5px 12.5px, 12.5px 12.5px, 12.5px 9.5px, 3.5px 9.5px, 3.5px 6.5px, 3.5px 6.5px); }
+  28% { clip-path: polygon(3.5px 12.5px, 12.5px 12.5px, 12.5px 9.5px, 6.5px 9.5px, 6.5px 6.5px, 3.5px 6.5px); }
+  35% { clip-path: polygon(3.5px 12.5px, 12.5px 12.5px, 12.5px 9.5px, 9.5px 9.5px, 9.5px 6.5px, 3.5px 6.5px); }
+  42% { clip-path: polygon(3.5px 12.5px, 12.5px 12.5px, 12.5px 6.5px, 3.5px 6.5px, 3.5px 3.5px, 3.5px 3.5px); }
+  49% { clip-path: polygon(3.5px 12.5px, 12.5px 12.5px, 12.5px 6.5px, 6.5px 6.5px, 6.5px 3.5px, 3.5px 3.5px); }
+  56% { clip-path: polygon(3.5px 12.5px, 12.5px 12.5px, 12.5px 6.5px, 9.5px 6.5px, 9.5px 3.5px, 3.5px 3.5px); }
+  63% { clip-path: polygon(3.5px 12.5px, 12.5px 12.5px, 12.5px 3.5px, 3.5px 3.5px, 3.5px 0.5px, 3.5px 0.5px); }
+  72% { clip-path: inset(3.5px 3.5px 6.5px); }
+  82% { clip-path: inset(3.5px 3.5px 9.5px); }
+  92%, 100% { clip-path: inset(3.5px 3.5px 12.5px); }
 }
 
 /* Recommendation badge: the host dark palette would fill and ink the tag with
@@ -3666,6 +3668,55 @@ body[data-dsh-orca-link] [data-orca-link-icon] > :not([data-orca-link-icon-art])
   display: none;
 }
 
+/* The host rotates the SVG itself; the hourglass turns only after draining. */
+body[data-dsh-orca-link] svg[data-orca-link-icon='loading'] {
+  animation: none;
+}
+
+body[data-dsh-orca-link] [data-orca-hourglass] {
+  transform-origin: 8px 8px;
+  animation: orcaHourglassTurn 2.8s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+body[data-dsh-orca-link] [data-orca-hourglass-sand] {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+}
+
+body[data-dsh-orca-link] [data-orca-hourglass-sand='upper'] {
+  animation: orcaHourglassDrain 2.8s linear infinite;
+}
+
+body[data-dsh-orca-link] [data-orca-hourglass-sand='lower'] {
+  animation: orcaHourglassFill 2.8s linear infinite;
+}
+
+body[data-dsh-orca-link] [data-orca-hourglass-stream] {
+  animation: orcaHourglassStream 2.8s linear infinite;
+}
+
+@keyframes orcaHourglassTurn {
+  0%, 82% { transform: rotate(0deg); }
+  100% { transform: rotate(180deg); }
+}
+
+@keyframes orcaHourglassDrain {
+  0%, 6% { transform: scaleY(1); }
+  76%, 100% { transform: scaleY(0); }
+}
+
+@keyframes orcaHourglassFill {
+  0%, 6% { transform: scaleY(0); }
+  76%, 100% { transform: scaleY(1); }
+}
+
+@keyframes orcaHourglassStream {
+  0%, 6% { opacity: 0; stroke-dashoffset: 0; }
+  10% { opacity: 1; }
+  72% { opacity: 1; }
+  76%, 100% { opacity: 0; stroke-dashoffset: -10; }
+}
+
 body[data-dsh-orca-link] {
   --aion-bg-base: var(--orca-surface-strong);
   --aion-bg-1: var(--orca-surface);
@@ -3702,6 +3753,11 @@ body[data-dsh-orca-link] {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  body[data-dsh-orca-link] [data-orca-hourglass],
+  body[data-dsh-orca-link] [data-orca-hourglass-sand],
+  body[data-dsh-orca-link] [data-orca-hourglass-stream] { animation: none; }
+  body[data-dsh-orca-link] [data-orca-hourglass-sand] { transform: scaleY(0.5); }
+  body[data-dsh-orca-link] [data-orca-hourglass-stream] { opacity: 0; }
   body[data-dsh-orca-link] [data-composer-seat][data-orca-composer-manual-hidden] { opacity: 0; }
   body[data-dsh-orca-link] button,
   body[data-dsh-orca-link] [role='button'],

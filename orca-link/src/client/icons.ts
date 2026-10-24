@@ -210,7 +210,14 @@ const ICON_ART: Record<string, string> = {
     '<path d="M2.5 13.25V4.5L4.75 2.25h6.5L13.5 4.5v4"/>',
     '<path d="M12.25 7.25 13.5 8.5 14.75 7.25"/>',
   ].join(''),
-  loading: ['<path d="M8 2.25H2.25v11.5h11.5V8"/>'].join(''),
+  loading: [
+    '<g data-orca-hourglass>',
+    '<path d="M3 2h10M3 14h10M4.5 2v3.25L7.25 8 4.5 10.75V14M11.5 2v3.25L8.75 8l2.75 2.75V14" stroke-width="1.25"/>',
+    '<path data-orca-hourglass-sand="upper" d="M5.5 3.5h5V5H9v1.5H7V5H5.5z" fill="currentColor" stroke="none"/>',
+    '<path data-orca-hourglass-sand="lower" d="M7 9.5h2V11h1.5v1.5h-5V11H7z" fill="currentColor" stroke="none"/>',
+    '<path data-orca-hourglass-stream d="M8 7v5.5" stroke-width="1" stroke-dasharray="1 1" stroke-linecap="butt"/>',
+    '</g>',
+  ].join(''),
   code: [
     '<path d="M6.5 2.5 5 13.5M11.5 2.5 10 13.5M2.5 6.25h11M2 10h11"/>',
   ].join(''),
