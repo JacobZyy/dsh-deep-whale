@@ -2935,13 +2935,14 @@ html[data-windows-titlebar] body[data-dsh-maid-atelier] > [data-windows-menu] {
 			for (const element of touched) {
 				const before = current.get(element);
 				const after = desired.get(element);
+				const exiting = element.closest("[inert], [aria-hidden='true']") !== null;
 				if (before !== void 0) {
-					for (const flag of before) if (!after?.has(flag)) element.removeAttribute(flag);
+					for (const flag of before) if (!after?.has(flag) && !exiting) element.removeAttribute(flag);
 				}
 				if (after !== void 0) {
 					for (const flag of after) if (!before?.has(flag)) element.setAttribute(flag, "");
 					if (after.size > 0) decoratedElements.add(element);
-				}
+				} else if (exiting) decoratedElements.add(element);
 			}
 		}
 		const inject = ["layout"];

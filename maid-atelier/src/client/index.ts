@@ -484,9 +484,18 @@ function decorateWorkspaceTree(decoratedElements: Set<HTMLElement>): void {
   for (const element of touched) {
     const before = current.get(element)
     const after = desired.get(element)
+    /* A row the host is fading out lives in a clone it parks in the exit
+       overlay: AnimatedRows clones the row, clears `data-row-key`, marks the
+       clone inert and appends it to an aria-hidden layer before dropping the
+       element about 100ms later. That clone sits outside every [role='tree'],
+       so it never reaches `desired` above; stripping its hooks there handed
+       the row back to the host's native folder glyph for the whole fade. Hold
+       the hooks still inside the overlay and let the host remove the element
+       itself — nothing here schedules a timer or remembers rows. */
+    const exiting = element.closest("[inert], [aria-hidden='true']") !== null
     if (before !== undefined) {
       for (const flag of before) {
-        if (!after?.has(flag)) element.removeAttribute(flag)
+        if (!after?.has(flag) && !exiting) element.removeAttribute(flag)
       }
     }
     if (after !== undefined) {
@@ -494,6 +503,11 @@ function decorateWorkspaceTree(decoratedElements: Set<HTMLElement>): void {
         if (!before?.has(flag)) element.setAttribute(flag, '')
       }
       if (after.size > 0) decoratedElements.add(element)
+    } else if (exiting) {
+      // Keep the fading clone on the retraction ledger even though this pass no
+      // longer claims it: the host drops the element within ROW_FADE_MS, but an
+      // explicit dispose must not leave skin hooks behind if it outlives that.
+      decoratedElements.add(element)
     }
   }
 }
