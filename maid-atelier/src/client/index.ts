@@ -418,6 +418,14 @@ function decorateSidebar(ownedNodes: Set<Element>, decoratedElements: Set<HTMLEl
 }
 
 function decorateWorkspaceTree(decoratedElements: Set<HTMLElement>): void {
+  // The host removes exit clones after their fade. Retract and release detached
+  // nodes before the sidebar lookup, including when the whole sidebar unmounts.
+  for (const element of decoratedElements) {
+    if (element.isConnected) continue
+    element.removeAttribute(SIDEBAR_FOOTER_FLAG)
+    for (const flag of WORKSPACE_FLAGS) element.removeAttribute(flag)
+    decoratedElements.delete(element)
+  }
   const sidebar = document.querySelector<HTMLElement>(SIDEBAR_COLUMN_SELECTOR)
   if (!sidebar) return
 
@@ -491,7 +499,7 @@ function decorateWorkspaceTree(decoratedElements: Set<HTMLElement>): void {
        so it never reaches `desired` above; stripping its hooks there handed
        the row back to the host's native folder glyph for the whole fade. Hold
        the hooks still inside the overlay and let the host remove the element
-       itself — nothing here schedules a timer or remembers rows. */
+       itself; the next structural scan retracts and releases detached rows. */
     const exiting = element.closest("[inert], [aria-hidden='true']") !== null
     if (before !== undefined) {
       for (const flag of before) {

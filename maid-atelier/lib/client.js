@@ -2881,6 +2881,12 @@ html[data-windows-titlebar] body[data-dsh-maid-atelier] > [data-windows-menu] {
 			}
 		}
 		function decorateWorkspaceTree(decoratedElements) {
+			for (const element of decoratedElements) {
+				if (element.isConnected) continue;
+				element.removeAttribute(SIDEBAR_FOOTER_FLAG);
+				for (const flag of WORKSPACE_FLAGS) element.removeAttribute(flag);
+				decoratedElements.delete(element);
+			}
 			const sidebar = document.querySelector(SIDEBAR_COLUMN_SELECTOR);
 			if (!sidebar) return;
 			const current = /* @__PURE__ */ new Map();
