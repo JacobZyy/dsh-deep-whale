@@ -333,7 +333,7 @@ body[data-dsh-orca-link] > [style*='--dsh-hover-preview-fade'] {
    6px core on `::after` with a hard-coded 50% radius, and the numbered step
    variant is a round badge; neither is a token surface. Both are an
    aria-hidden span carrying `data-state`, so square that pair locally; the
-   ongoing spinner is an SVG glyph and keeps its ring. */
+   ongoing SVG loader is redrawn separately by icons.ts. */
 body[data-dsh-orca-link] :where(span[data-state][aria-hidden='true']):not(
   [data-slot='conversation.input.left'] *,
   [data-slot='conversation.input.right'] *,
@@ -3669,6 +3669,32 @@ body[data-dsh-orca-link] [data-orca-link-icon] > :not([data-orca-link-icon-art])
 }
 
 /* The host rotates the SVG itself; the hourglass turns only after draining. */
+body[data-dsh-orca-link] :is(
+  [class$='_skeletonFill'], [class*='_skeletonFill '],
+  [class$='_skeletonBar'], [class*='_skeletonBar '],
+  [class$='_skeletonDot'], [class*='_skeletonDot ']
+) {
+  border-radius: 0 !important;
+}
+
+body[data-dsh-orca-link] [data-orca-link-loader] {
+  position: relative !important;
+  border-color: transparent !important;
+  animation: none !important;
+}
+
+body[data-dsh-orca-link] [data-orca-link-loader]::before {
+  display: none !important;
+}
+
+body[data-dsh-orca-link] [data-orca-link-loader-art] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
 body[data-dsh-orca-link] svg[data-orca-link-icon='loading'] {
   animation: none;
 }

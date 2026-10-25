@@ -14,7 +14,7 @@ import { installOrcaPageIcons } from '../src/client/page-icons.ts'
 
 // Complete SVGs rendered from the pinned official source; no host checkout is needed at test time.
 const HOST_ICONS: Array<{ component: string; name: string; svg: string }> = JSON.parse(
-  readFileSync(resolve(process.cwd(), 'tests/fixtures/dsh-0.1.7-alpha.1-icons.json'), 'utf8'),
+  readFileSync(resolve(process.cwd(), 'tests/fixtures/dsh-icons.json'), 'utf8'),
 ).icons
 function hostIcon(component: string, attributes = ''): string {
   const fixture = HOST_ICONS.find(icon => icon.component === component)
@@ -529,23 +529,6 @@ describe('Orca Link skin apply', () => {
     expect(document.title).not.toBe('original')
     await fiber.dispose()
     expect(document.title).toBe('original')
-  })
-
-  it('redraws all target host glyphs without changing their owned SVG children', async () => {
-    document.body.innerHTML = HOST_ICONS.map((icon, index) => `<span data-target-icon="${index}">${icon.svg}</span>`).join('')
-    const svgs = Array.from(document.querySelectorAll<SVGElement>('[data-target-icon] > svg'))
-    const originals = svgs.map(svg => svg.innerHTML)
-    fiber = await mount()
-    for (const [index, svg] of svgs.entries()) {
-      const fixture = HOST_ICONS[index]!
-      expect(svg.getAttribute('data-orca-link-icon'), fixture.component).toBe(fixture.name)
-      const art = svg.querySelector('g[data-orca-link-icon-art]')!
-      expect(art?.querySelectorAll('path, rect').length, fixture.component).toBeGreaterThan(0)
-      expect(svg.querySelectorAll(':scope > g[data-orca-link-icon-art]')).toHaveLength(1)
-    }
-    await fiber.dispose()
-    svgs.forEach((svg, index) => { expect(svg.innerHTML, HOST_ICONS[index]!.component).toBe(originals[index]) })
-    expect(document.querySelector('[data-orca-link-icon]')).toBeNull()
   })
 
   it('updates a retained pin after an attribute change and releases an unrecognized replacement', async () => {

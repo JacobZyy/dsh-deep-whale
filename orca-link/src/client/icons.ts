@@ -14,7 +14,7 @@ import { hasMutationOutsideTerminal } from './mutation-filter.ts'
  *
  * Keys are distinctive fragments of the host path data as rendered by
  * @deepseek-ai/dsh-client-ui-primitives (verified against that package's
- * icons/index.tsx at c36a83ff6bb9, including its Regular/Medium variants).
+ * icons/index.tsx at 687f282e8625, including its Regular/Medium variants).
  * Unmatched drawings, such as the brand wordmark and hero artwork, keep
  * their host geometry.
  */
@@ -145,6 +145,10 @@ const ICON_ART: Record<string, string> = {
   'permission-full': [
     '<path d="M2.25 6V2.25H6M10 2.25h3.75V6M13.75 10v3.75H10M6 13.75H2.25V10"/>',
     '<path d="M5.75 5.75h4.5v4.5h-4.5z" fill="currentColor" stroke="none"/>',
+  ].join(''),
+  'permission-auto': [
+    '<path d="M2.5 2.5h11v8L8 14l-5.5-3.5z"/>',
+    '<path d="m5.5 10 2.5-5 2.5 5M6.5 8h3"/>',
   ].join(''),
   send: [
     '<path d="M8 12.5V2.75M3.75 7 8 2.75 12.25 7"/>',
@@ -313,6 +317,9 @@ const ICON_ART: Record<string, string> = {
   'archive-check': [
     '<path d="M1.75 2h12.5v3H1.75zM2.75 5v9h10.5V5M5 9l2 2 4-4"/>',
   ].join(''),
+  'archive-off': [
+    '<path d="M6 2h8.25v3H9M1.75 2v3H4M2.75 6.75V14h7.5M13.25 5v4.5M2 1.5l12 13"/>',
+  ].join(''),
   'check-circle': ['<path d="M2.25 2.25h11.5v11.5H2.25zM4.5 8l2.5 2.5 4.5-5"/>'].join(''),
   'chevrons-up-down': ['<path d="M4.5 6 8 2.5 11.5 6M4.5 10 8 13.5 11.5 10"/>'].join(''),
   'close-circle': ['<path d="M2.25 2.25h11.5v11.5H2.25zM5.5 5.5l5 5M10.5 5.5l-5 5"/>'].join(''),
@@ -322,6 +329,21 @@ const ICON_ART: Record<string, string> = {
   'deliver-doc': ['<path d="M3 1.75h7L13 4.75v9.5H3zM9.5 1.75V5H13M5 7h4M5 10l2 2 4-4"/>'].join(''),
   'flat-list': ['<path d="M6 3.5h8M6 8h8M6 12.5h8M2 2.5h2v2H2zM2 7h2v2H2zM2 11.5h2v2H2z"/>'].join(''),
   info: ['<path d="M2.25 2.25h11.5v11.5H2.25zM8 7v4M7 4.5h2"/>'].join(''),
+  bell: ['<path d="M4.5 5V11h7V5l-2-2h-3zM2 12.5h12M6.5 14h3M8 1v2"/>'].join(''),
+  calendar: ['<path d="M2 3.5h12V14H2zM2 6.5h12M5 1.5v4M11 1.5v4M5 9h2M9 9h2M5 11.5h2"/>'].join(''),
+  compass: ['<path d="M2 2h12v12H2zM5 11l6-6M7 5h4v4"/>'].join(''),
+  cube: ['<path d="M2 6l4-4h8v8l-4 4H2zM2 6h8v8M10 6l4-4"/>'].join(''),
+  document: ['<path d="M3 1.75h7L13 4.75v9.5H3zM9.5 1.75V5H13M5 8h6M5 11h4"/>'].join(''),
+  eye: ['<path d="M1.5 8l4-4h5l4 4-4 4h-5zM6.5 6.5h3v3h-3z"/>'].join(''),
+  'eye-off': ['<path d="M1.5 8l4-4h5l4 4-4 4h-5zM2 2l12 12"/>'].join(''),
+  file: ['<path d="M3 1.75h7L13 4.75v9.5H3zM9.5 1.75V5H13"/>'].join(''),
+  filter: ['<path d="M2 2.5h12L9 7.5v6L7 11.5V7.5z"/>'].join(''),
+  'fullscreen-exit': ['<path d="M2 6h4V2M10 2v4h4M14 10h-4v4M6 14v-4H2"/>'].join(''),
+  image: ['<path d="M2 2.5h12v11H2zM2 10l3-3 4 4 2-2 3 3M9 5h2v2H9z"/>'].join(''),
+  json: ['<path d="M6 2H4v4L2 8l2 2v4h2M10 2h2v4l2 2-2 2v4h-2"/>'].join(''),
+  logout: ['<path d="M7 2H2v12h5M6 8h8M11 5l3 3-3 3"/>'].join(''),
+  minus: ['<path d="M2 8h12"/>'].join(''),
+  target: ['<path d="M4.5 4.5h7v7h-7zM8 1v4M8 11v4M1 8h4M11 8h4"/>'].join(''),
   microphone: ['<path d="M5.5 1.75h5v8h-5zM2.5 7.5v4h11v-4M8 11.5v3M5.5 14.5h5"/>'].join(''),
   nowrap: ['<path d="M2 2v12M14 2v12M4 5h6M4 8h8M9.5 5.5 12 8l-2.5 2.5M4 11h3"/>'].join(''),
   'paper-plane': ['<path d="M1.75 6.75 14.25 1.75 9.25 14.25 6.75 9.25zM6.75 9.25l7.5-7.5"/>'].join(''),
@@ -383,18 +405,42 @@ function buildUsageCells(): SVGGElement {
   return cells
 }
 
-/** Target glyph fragments from DSH 0.1.7-alpha.1 (c36a83ff6bb9), plus the
- * keys marked "(0.1.7)" taken from the 0.1.7-rc.2 ui-primitives icons (the
- * clock, user and users artwork changed or first appeared there; the
- * tests/fixtures alpha.1 set still holds their older drawings, kept as the
- * "(<= 0.1.6)" keys).
+/** Target glyph fragments verified against DSH 0.2.1-rc.2 (687f282e8625).
  * Shared contours are keyed by their distinguishing drawing, not the frame.
- * Full alpha.1 target SVGs, including inline controls, live in tests/fixtures. */
+ * Full target SVGs, including inline controls, live in tests/fixtures. */
 const ICON_KEYS: ReadonlyArray<readonly [string, string]> = [
+  ['d="M9.5 1.5V6.5H14.5M1.5 9.5H6.5V14.5"', 'fullscreen-exit'], // JsonString collapse
+  ['d="M12.4326 2.38086H3.56763', 'image'], // LinkIcon photo
+  ['d="M3.51919 14.5069H12.4807', 'document'], // LinkIcon document
+  ['d="M3.75275 14.271H12.2473', 'file'], // LinkIcon file
+  ['d="M1.4 5.6H12.6"', 'calendar'], // CalendarIcon
+  ['d="M3.6355 6.93969C3.6355', 'bell'], // AccountNotice
+  ['d="M3.9961 1.40039C3.37842', 'logout'], // LogoutIcon
+  ['d="M10.28 5.86536C10.28', 'search'], // ShortcutReference
+  ['d="M2 8h12"', 'minus'], // ZoomControls
+  ['d="M2.33203 10.4054V13.1681', 'fullscreen'], // SidebarRight
+  ['d="M9 2.5V6C9 6.26522', 'fullscreen-exit'], // SidebarRight
+  ['d="M10.6101 5.39014L8.99014', 'compass'], // GuideTitle
+  ['d="M7.99998 2.5L12.9 5.2V10.8', 'cube'], // GuideTitle
+  ['d="m8 10 4 4-4 4M15 18h5"', 'terminal'], // Terminal empty state
+  ['d="M5.99951 12.7L8.95546', 'chevrons-up-down'], // SubagentSwitcherIcon
+  ['d="M14 3.3a3.8 3.8 0 0 1-4.8', 'wrench'], // Trajectory role
+  ['d="M8 7.75v3.4"', 'info'], // Trajectory role
+  ['d="m2.5 2.5 3.75 3.75M3 6.25', 'compact'], // Trajectory compacted role
+  ['d="M14.7 6.3a1 1 0 0 0 0 1.4', 'wrench'], // Trajectory call/catalog
+  ['d="M6 2H5a2 2 0 0 0-2 2v2', 'json'], // Trajectory program input
+  ['d="M8 4.75V8l2.25 1.5"', 'clock'], // Trajectory duration
+  ['d="M2 3h12L9.5 8v5l-3-1.5V8L2 3Z"', 'filter'], // Session inspector
+  ['d="M8 0v5M8 11v5M0 8h5M11 8h5"', 'target'], // Session inspector
+  ['1.5 8ZM2.5 2.5L13.5 13.5"', 'eye-off'], // SecretText / ApiKeyInput
+  ['M10 8C10 9.1 9.1 10 8 10', 'eye'], // SecretText / ApiKeyInput
+  ['d="M7.4553 1.01221C8.02829', 'edit'], // ShortcutIcon edit
+  ['d="M8.90039 3.97328V9.07973', 'warning'], // ShortcutIcon error
   ["d=\"M6.51867 12.3282C7.29816", 'agent-preset'], // IconAgentPresetOutlineMedium
   ["d=\"M4.09372 11.9895L3.11865", 'alarm-clock'], // IconAlarmClockOutlineMedium
   ["d=\"M9 12H13\"", 'terminal'], // IconApiOutlineMedium
-  ["d=\"M2.95 5.7v4.8a2.9 2.9 0 ", 'archive-check'], // IconArchiveCheckOutlineMedium
+  ['d="m6 9.35 1.4 1.4 2.6-2.6"', 'archive-check'], // IconArchiveCheckOutlineMedium
+  ['d="m2.2 1.3 11.6 12.8"', 'archive-off'], // IconArchiveOffOutlineMedium
   ["d=\"M6.5 9.5H9.5\"", 'archive'], // IconArchiveOutlineMedium
   ["d=\"M1.01503 8.0001L5.6964 8", 'branch'], // IconBranchOutlineMedium
   ["d=\"M12.5 1.32617C13.3039 1.32617 14 1.95171 14 2.77637V13.2246C13.9", 'browse'], // IconBrowseOutlineMedium
@@ -469,7 +515,7 @@ const ICON_KEYS: ReadonlyArray<readonly [string, string]> = [
   ["d=\"M2.3 11h1.65M7.85 11h5.8", 'sliders-two'], // IconSlidersTwoOutlineMedium
   ["d=\"M5.875 3C5.875 6.33333 7", 'sparkle'], // IconSparkleMedium
   ["d=\"M12.5 2.5H3.5C2.94772 2.", 'stop'], // IconStopFillMedium
-  ["d=\"M10.7554 5.24466C13.9891", 'think'], // IconThinkOutlineMedium
+  ["d=\"M10.2854 5.71481C12.9673", 'think'], // IconThinkOutlineMedium
   ["d=\"M5.41602 3.88833V2.47962", 'trash'], // IconTrashOutlineMedium
   ["d=\"M0.5 0V7C0.5 7.79565 0.8", 'tree-corner'], // IconTreeCornerMedium
   ["d=\"M5.5 4.5C5.5 4.40714 5.5", 'caret-right'], // IconTriangleRightFillMedium
@@ -485,6 +531,7 @@ const ICON_KEYS: ReadonlyArray<readonly [string, string]> = [
   ["d=\"M8 4.39209V9.89209\"", 'permission-full'], // PermissionIconFullAccessMedium
   ["d=\"M5.08545 8.13775L7.18455", 'permission-read'], // PermissionIconReadOnlyMedium
   ["d=\"M6.4209 1.68067C7.43922 ", 'permission-write'], // PermissionIconWorkspaceWriteMedium
+  ['d="M5.75 10.15L8 4.95L10.25 10.15', 'permission-auto'], // PermissionIconAutoReviewMedium
   ["d=\"M8.3125 0.980183C8.66767", 'send'], // ComposerSend
   ["<rect x=\"3\" y=\"3\" width=\"10\" height=\"10\" rx=\"3\" fill=\"currentColor\">", 'stop'], // ComposerStop
   ["d=\"M8 1.5V14.5\"", 'compare-split'], // DockSplit
@@ -550,6 +597,10 @@ function isUsageRing(svg: SVGElement): boolean {
 
 /** Resolve the ORCA art name for one host SVG, or null when nothing matches. */
 function resolveIconName(svg: SVGElement): string | null {
+  // StateDot loaders are separate from the primitive icon export table.
+  if (svg.getAttribute('data-state') === 'ongoing'
+    && svg.getAttribute('viewBox') === '0 0 24 24'
+    && svg.querySelectorAll('circle[cx="12"][cy="12"][r="9.5"]').length === 2) return 'loading'
   if (isUsageRing(svg)) return 'usage'
   const matched = matchIcon(hostHtml(svg))
   return matched === null ? null : contextualName(svg, matched)
@@ -628,6 +679,38 @@ function syncUsageFill(svg: SVGElement, art: SVGGElement): void {
  */
 export function installOrcaIcons(body: HTMLElement): () => void {
   const usageObservers = new Map<Element, MutationObserver>()
+  const iconArts = new Map<SVGElement, SVGGElement>()
+  const htmlLoaders = new Map<HTMLElement, SVGElement>()
+  const loaderCandidates = 'span[class$="_spinner"]'
+  const loaderSelector = [
+    '[class$="_card"][title] > [class$="_icon"][aria-hidden="true"] > span[class$="_spinner"]',
+    '[role="dialog"][aria-modal="true"] > [class$="_viewport"] > [role="status"] > span[class$="_spinner"][aria-hidden="true"]',
+  ].join(',')
+
+  const decorateLoader = (node: Element): void => {
+    if (!(node instanceof HTMLElement) || !node.matches(loaderSelector) || node.hasAttribute('data-orca-link-loader')) return
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+    htmlLoaders.set(node, svg)
+    node.setAttribute('data-orca-link-loader', '')
+    svg.setAttribute('viewBox', '0 0 16 16')
+    svg.setAttribute('aria-hidden', 'true')
+    svg.setAttribute('data-orca-link-loader-art', '')
+    svg.setAttribute(ICON_ATTRIBUTE, 'loading')
+    svg.append(buildArt('loading', svg))
+    node.append(svg)
+  }
+
+  const collectLoaders = (node: Node): void => {
+    if (!(node instanceof Element)) return
+    if (node.matches(loaderCandidates)) decorateLoader(node)
+    node.querySelectorAll(loaderCandidates).forEach(decorateLoader)
+  }
+
+  const removeLoader = (node: HTMLElement, svg: SVGElement): void => {
+    svg.remove()
+    node.removeAttribute('data-orca-link-loader')
+    htmlLoaders.delete(node)
+  }
 
   const observeUsage = (svg: SVGElement, art: SVGGElement): void => {
     syncUsageFill(svg, art)
@@ -650,16 +733,29 @@ export function installOrcaIcons(body: HTMLElement): () => void {
   const applyToSvg = (svg: SVGElement): boolean => {
     const name = resolveIconName(svg)
     if (name === null) return false
-    svg.setAttribute(ICON_ATTRIBUTE, name)
     const art = buildArt(name, svg)
+    iconArts.set(svg, art)
+    svg.setAttribute(ICON_ATTRIBUTE, name)
     if (name === 'usage') observeUsage(svg, art)
     svg.append(art)
     syncPermissionHost(svg, name)
     return true
   }
 
+  const releaseSvg = (svg: SVGElement): void => {
+    const art = iconArts.get(svg)
+    if (!art) return
+    if (svg.getAttribute(ICON_ATTRIBUTE)?.startsWith('permission-')) {
+      svg.closest('button, [role="menuitem"]')?.removeAttribute('data-orca-permission')
+    }
+    art.remove()
+    svg.removeAttribute(ICON_ATTRIBUTE)
+    iconArts.delete(svg)
+  }
+
   const reconcileSvg = (svg: SVGElement): void => {
-    if (!svg.isConnected) return
+    if (!svg.isConnected || svg.hasAttribute('data-orca-link-loader-art')) return
+    if (svg.hasAttribute(ICON_ATTRIBUTE) && !iconArts.has(svg)) return
     const art = svg.querySelector(`[${ICON_ART_ATTRIBUTE}]`)
     if (!(art instanceof SVGGElement)) {
       applyToSvg(svg)
@@ -672,11 +768,7 @@ export function installOrcaIcons(body: HTMLElement): () => void {
     const currentName = svg.getAttribute(ICON_ATTRIBUTE)
     const nextName = resolveIconName(svg)
     if (nextName !== currentName) {
-      if (currentName?.startsWith('permission-') && !nextName?.startsWith('permission-')) {
-        svg.closest('button, [role="menuitem"]')?.removeAttribute('data-orca-permission')
-      }
-      art.remove()
-      svg.removeAttribute(ICON_ATTRIBUTE)
+      releaseSvg(svg)
       if (nextName !== null) applyToSvg(svg)
       return
     }
@@ -706,7 +798,7 @@ export function installOrcaIcons(body: HTMLElement): () => void {
   }
 
   const belongsToArt = (node: Node): boolean => (
-    node instanceof Element && node.closest(`[${ICON_ART_ATTRIBUTE}]`) !== null
+    node instanceof Element && node.closest(`[${ICON_ART_ATTRIBUTE}], [data-orca-link-loader-art]`) !== null
   )
 
   const pruneUsageObservers = (): void => {
@@ -717,9 +809,6 @@ export function installOrcaIcons(body: HTMLElement): () => void {
     }
   }
 
-  body.querySelectorAll('svg').forEach((svg) => {
-    if (svg instanceof SVGElement) reconcileSvg(svg)
-  })
   const mountObserver = new MutationObserver((records) => {
     if (!hasMutationOutsideTerminal(records)) return
     const changed = new Set<SVGElement>()
@@ -730,22 +819,36 @@ export function installOrcaIcons(body: HTMLElement): () => void {
       // they must not schedule a second reconciliation pass.
       if (nodes.length > 0 && nodes.every(belongsToArt)) continue
       collectContainingSvg(record.target, changed)
-      record.addedNodes.forEach(node => collectSvgSubtree(node, changed))
+      record.addedNodes.forEach(node => {
+        collectSvgSubtree(node, changed)
+        collectLoaders(node)
+      })
+      record.removedNodes.forEach(node => collectSvgSubtree(node, changed))
     }
-    changed.forEach(reconcileSvg)
+    changed.forEach(svg => { if (svg.isConnected) reconcileSvg(svg); else releaseSvg(svg) })
     pruneUsageObservers()
-  })
-  mountObserver.observe(body, {
-    childList: true, subtree: true, attributes: true,
-    attributeFilter: ['d', 'fill', 'stroke', 'viewBox'],
+    for (const [node, svg] of htmlLoaders) if (!node.isConnected) removeLoader(node, svg)
   })
 
-  return () => {
+  const dispose = (): void => {
     mountObserver.disconnect()
     for (const observer of usageObservers.values()) observer.disconnect()
     usageObservers.clear()
-    body.querySelectorAll(`[${ICON_ART_ATTRIBUTE}]`).forEach((node) => node.remove())
-    body.querySelectorAll(`[${ICON_ATTRIBUTE}]`).forEach((node) => node.removeAttribute(ICON_ATTRIBUTE))
-    body.querySelectorAll('[data-orca-permission]').forEach((node) => node.removeAttribute('data-orca-permission'))
+    for (const [node, svg] of htmlLoaders) removeLoader(node, svg)
+    for (const svg of iconArts.keys()) releaseSvg(svg)
   }
+  try {
+    body.querySelectorAll('svg').forEach((svg) => {
+      if (svg instanceof SVGElement) reconcileSvg(svg)
+    })
+    collectLoaders(body)
+    mountObserver.observe(body, {
+      childList: true, subtree: true, attributes: true,
+      attributeFilter: ['d', 'fill', 'stroke', 'viewBox', 'data-state'],
+    })
+  } catch (error) {
+    dispose()
+    throw error
+  }
+  return dispose
 }
