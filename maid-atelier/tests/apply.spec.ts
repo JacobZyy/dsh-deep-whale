@@ -636,6 +636,132 @@ describe('Maid Atelier skin apply', () => {
     expect(document.querySelector('[data-maid-session-last]')).toBeNull()
   })
 
+  it('keeps skin hooks on a row the host is fading out of the exit overlay', async () => {
+    // The host removes a row by cloning it into an aria-hidden layer, marking the
+    // clone inert and fading it for ROW_FADE_MS. The clone is outside every
+    // [role='tree'], so the decorator's desired set stops listing it; stripping
+    // its hooks in that pass handed the row back to the host's native folder
+    // glyph for the whole fade, which is the flicker this spec pins down.
+    document.body.innerHTML = `
+      <div class="AppFrame_sidebarCol">
+        <div>
+          <div role="tree">
+            <div role="treeitem" aria-expanded="true"><span class="fixture_folder"></span></div>
+            <div role="treeitem" aria-selected="true"><span class="fixture_title">Current</span></div>
+          </div>
+        </div>
+      </div>
+    `
+    fiber = await mount()
+
+    const workspace = document.querySelector<HTMLElement>("[role='treeitem'][aria-expanded]")!
+    const session = document.querySelector<HTMLElement>("[role='treeitem'][aria-selected]")!
+    expect(workspace.hasAttribute('data-maid-workspace-row')).toBe(true)
+    expect(session.hasAttribute('data-maid-session-row')).toBe(true)
+
+    const overlay = document.createElement('div')
+    overlay.className = 'RsIu1q_exits'
+    overlay.setAttribute('aria-hidden', 'true')
+    const clone = workspace.cloneNode(true) as HTMLElement
+    clone.inert = true
+    overlay.append(clone)
+    workspace.remove()
+    document.querySelector('.AppFrame_sidebarCol')!.append(overlay)
+    await flushMutations()
+
+    expect(clone.hasAttribute('data-maid-workspace-row')).toBe(true)
+
+    // A live row keeps the original retraction contract: dropping out of the
+    // tree still clears its hooks, so the exemption stays scoped to the overlay.
+    workspace.removeAttribute('aria-expanded')
+    document.querySelector("[role='tree']")!.append(workspace)
+    await flushMutations()
+    expect(workspace.hasAttribute('data-maid-workspace-row')).toBe(false)
+
+    // Dispose still retracts the overlay clone the decorator deliberately left
+    // alone, because textContent-only bookkeeping kept it in the owned set.
+    await fiber.dispose()
+    expect(clone.hasAttribute('data-maid-workspace-row')).toBe(false)
+  })
+
+  it('releases detached decorations after repeated workspace exit animations', async () => {
+    document.body.innerHTML = `
+      <div class="AppFrame_sidebarCol"><div>
+        <div class="fixture_groupSection" role="tree">
+          <div role="treeitem" aria-expanded="true"><span class="fixture_folder"></span></div>
+          <div role="treeitem" aria-selected="true">Current</div>
+        </div>
+        <div aria-hidden="true" id="exits"></div>
+        <footer><div data-slot="sidebar.settings"></div><div data-slot="sidebar.footer.action"></div></footer>
+      </div></div>
+    `
+    const tree = document.querySelector<HTMLElement>("[role='tree']")!
+    const overlay = document.querySelector<HTMLElement>('#exits')!
+    const workspace = tree.querySelector<HTMLElement>('[aria-expanded]')!
+    const session = tree.querySelector<HTMLElement>('[aria-selected]')!
+    const footer = document.querySelector('footer')!
+    const track = vi.spyOn(Set.prototype, 'add')
+    let ledger: Set<HTMLElement> | undefined
+    try {
+      fiber = await mount()
+      // The disposal ledger owns both footer and workspace decorations.
+      ledger = track.mock.contexts.find(set => set.has(footer) && set.has(workspace))
+    } finally {
+      track.mockRestore()
+    }
+    expect(ledger).toBeDefined()
+    for (let cycle = 0; cycle < 3; cycle += 1) {
+      const clones = [workspace, session].map(row => {
+        const clone = row.cloneNode(true) as HTMLElement
+        clone.inert = true
+        overlay.append(clone)
+        row.remove()
+        return clone
+      })
+      await flushMutations()
+      expect(clones[0]!.hasAttribute('data-maid-workspace-row')).toBe(true)
+      expect(clones[1]!.hasAttribute('data-maid-session-row')).toBe(true)
+
+      // Another structural scan must leave connected exit clones intact.
+      tree.append(document.createElement('span'))
+      await flushMutations()
+      for (const clone of clones) expect(ledger!.has(clone)).toBe(true)
+      expect(clones[0]!.hasAttribute('data-maid-workspace-row')).toBe(true)
+
+      clones.forEach(clone => clone.remove())
+      await flushMutations()
+      for (const element of [...clones, workspace, session]) {
+        expect(ledger!.has(element)).toBe(false)
+        expect([...element.attributes].some(attr => attr.name.startsWith('data-maid-'))).toBe(false)
+      }
+      tree.append(workspace, session)
+      await flushMutations()
+      expect(workspace.hasAttribute('data-maid-workspace-row')).toBe(true)
+      expect(session.hasAttribute('data-maid-session-row')).toBe(true)
+    }
+  })
+
+  it('retracts detached exit clones when the whole sidebar unmounts', async () => {
+    document.body.innerHTML = `
+      <div class="AppFrame_sidebarCol"><div>
+        <div role="tree"><div role="treeitem" aria-expanded="true"></div></div>
+        <div aria-hidden="true" id="exits"></div>
+      </div></div>
+    `
+    fiber = await mount()
+    const row = document.querySelector<HTMLElement>('[aria-expanded]')!
+    const clone = row.cloneNode(true) as HTMLElement
+    clone.inert = true
+    document.querySelector('#exits')!.append(clone)
+    await flushMutations()
+    expect(clone.hasAttribute('data-maid-workspace-row')).toBe(true)
+    document.querySelector('.AppFrame_sidebarCol')!.remove()
+    await flushMutations()
+    for (const element of [clone, row]) {
+      expect(element.hasAttribute('data-maid-workspace-row')).toBe(false)
+    }
+  })
+
   it('marks every Session row in the flat list without inventing a Workspace group', async () => {
     document.body.innerHTML = `
       <div class="AppFrame_sidebarCol">
