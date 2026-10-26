@@ -2987,6 +2987,11 @@ body[data-dsh-maid-atelier] [data-maid-workspace-sessions] > [role='group']::bef
   pointer-events: none;
 }
 
+/* Top-level cards reach the row edge; nested plaques end 4px above it. */
+body[data-dsh-maid-atelier] [role='tree'] > [data-maid-workspace-sessions] > [role='group']::before {
+  top: -2px;
+}
+
 @keyframes maidAtelierWorkspaceRibbonEnter {
   from {
     opacity: 0;
