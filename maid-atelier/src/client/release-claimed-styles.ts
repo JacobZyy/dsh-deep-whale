@@ -3,7 +3,7 @@
  * beside the helper (and pinned to package.json by a test) because the loader
  * gives a bundle no way to ask for its own id.
  */
-export const SKIN_PACKAGE_ID = '@smalltailqwq/dsh-client-ui-skin-maid-atelier'
+export const SKIN_PACKAGE_ID = '@jacob-z/dsh-client-ui-skin-maid-atelier'
 
 /**
  * Hand back the `<style>` tags the loader claimed for this skin by mistake.

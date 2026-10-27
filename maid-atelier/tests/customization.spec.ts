@@ -110,9 +110,9 @@ describe('maid customization declaration', () => {
     const definition = registration!.definition
     const workspaceFont = definition.settings.find(setting => setting.key === 'workspaceFont')
     expect(workspaceFont?.type).toBe('select')
-    expect(workspaceFont?.defaultValue).toBe('serif')
+    expect(workspaceFont?.defaultValue).toBe('system')
     expect(workspaceFont && workspaceFont.type === 'select' ? workspaceFont.options.map(option => option.value) : [])
-      .toEqual(['serif', 'system', 'conversation'])
+      .toEqual(['system', 'serif', 'conversation'])
 
     const values = normalizeSkinValues(definition, { workspaceFont: 'conversation' })
     definition.apply({ values, visibility: { sfwMode: true } })
@@ -120,7 +120,7 @@ describe('maid customization declaration', () => {
     // An unknown value — a state forged by a manager written against a later
     // declaration — means the skin default rather than a second, unstyled mode.
     definition.apply({ values: { ...values, workspaceFont: 'comic' }, visibility: { sfwMode: true } })
-    expect(document.documentElement.getAttribute('data-dsh-whale-maid-workspace-font')).toBe('serif')
+    expect(document.documentElement.getAttribute('data-dsh-whale-maid-workspace-font')).toBe('system')
 
     dispose()
     expect(document.documentElement.hasAttribute('data-dsh-whale-maid-workspace-font')).toBe(false)
@@ -135,7 +135,7 @@ describe('maid customization declaration', () => {
     const definition = registration!.definition
     const rowHeight = definition.settings.find(setting => setting.key === 'workspaceRowHeight')
     expect(rowHeight?.type).toBe('range')
-    expect(rowHeight?.defaultValue).toBe(54)
+    expect(rowHeight?.defaultValue).toBe(48)
     expect(rowHeight && rowHeight.type === 'range' ? [rowHeight.min, rowHeight.max, rowHeight.step, rowHeight.unit] : [])
       .toEqual([22, 54, 1, 'px'])
 
@@ -151,7 +151,7 @@ describe('maid customization declaration', () => {
     definition.apply({ values: { ...values, workspaceRowHeight: 12 }, visibility: { sfwMode: true } })
     expect(document.documentElement.style.getPropertyValue('--maid-workspace-row-height')).toBe('22px')
     definition.apply({ values: normalizeSkinValues(definition, {}), visibility: { sfwMode: true } })
-    expect(document.documentElement.style.getPropertyValue('--maid-workspace-row-height')).toBe('54px')
+    expect(document.documentElement.style.getPropertyValue('--maid-workspace-row-height')).toBe('48px')
 
     dispose()
     expect(document.documentElement.style.getPropertyValue('--maid-workspace-row-height')).toBe('')

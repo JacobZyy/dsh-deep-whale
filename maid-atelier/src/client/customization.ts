@@ -21,7 +21,7 @@ const NAV_MODES = new Set(['corner', 'topbar', 'rail'])
 const WORKSPACE_FONTS = new Set(['serif', 'system', 'conversation'])
 
 // Keep the original banner height unless the user chooses a compact layout.
-const WORKSPACE_ROW_HEIGHT_DEFAULT = 54
+const WORKSPACE_ROW_HEIGHT_DEFAULT = 48
 const WORKSPACE_ROW_HEIGHT_MIN = 22
 const WORKSPACE_ROW_HEIGHT_MAX = 54
 const WORKSPACE_ROW_HEIGHT_PROPERTY = '--maid-workspace-row-height'
@@ -169,7 +169,7 @@ export function installMaidCustomization(root: HTMLElement = document.documentEl
     projector.set(ATTR_ART, artwork && scheduleVisible ? 'visible' : 'hidden')
     projector.set(ATTR_FONT, state.values.font === 'serif' ? 'serif' : 'system')
     const workspaceFont = state.values.workspaceFont
-    projector.set(ATTR_WORKSPACE_FONT, typeof workspaceFont === 'string' && WORKSPACE_FONTS.has(workspaceFont) ? workspaceFont : 'serif')
+    projector.set(ATTR_WORKSPACE_FONT, typeof workspaceFont === 'string' && WORKSPACE_FONTS.has(workspaceFont) ? workspaceFont : 'system')
     projector.set(ATTR_FLASH_GLASSES, state.values.flashGlasses === true ? 'on' : 'off')
     synchronizeModelMode()
     projector.set(ATTR_COMPOSER_MODE, typeof state.values.composerMode === 'string' ? state.values.composerMode : 'persistent')
@@ -219,10 +219,10 @@ export function installMaidCustomization(root: HTMLElement = document.documentEl
         labelEn: 'Sidebar font',
         description: '调整侧栏中工作区和会话标签的字体。',
         descriptionEn: 'Font for workspace and conversation labels in the sidebar.',
-        defaultValue: 'serif',
+        defaultValue: 'system',
         options: [
-          { value: 'serif', label: 'Georgia 衬线（皮肤默认）', labelEn: 'Georgia serif (skin default)' },
-          { value: 'system', label: '系统默认无衬线', labelEn: 'System default sans' },
+          { value: 'system', label: '中文优先的 UI 无衬线（默认）', labelEn: 'UI sans, CJK-first (default)' },
+          { value: 'serif', label: 'Georgia 衬线（原皮肤默认）', labelEn: 'Georgia serif (former default)' },
           { value: 'conversation', label: '跟随对话区字体', labelEn: 'Follow the conversation font' },
         ],
       },

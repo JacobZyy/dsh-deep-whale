@@ -998,7 +998,6 @@ describe('Maid Atelier skin apply', () => {
     expect(document.querySelector("[data-skin-chrome='composer-lace']")).toBeNull()
     expect(document.querySelector('[data-maid-composer-lace-center]')).toBeNull()
     expect(document.body.style.getPropertyValue('--maid-settings-frame-art')).toBe('')
-    expect(document.body.style.getPropertyValue('--maid-workspace-crest-art')).toBe('')
     expect(document.body.style.getPropertyValue('--maid-workspace-ribbon-art')).toBe('legacy-ribbon')
   })
 
@@ -2288,11 +2287,12 @@ describe('Maid Atelier skin apply', () => {
   })
 
   it('lets the sidebar Workspace typography follow its own switch', () => {
-    // One variable carries every Workspace surface, so the manager needs a single
-    // arm per mode; serif is the variable's own default and needs no rule.
-    expect(CSS).toContain("--maid-workspace-font: Georgia, 'Times New Roman', serif")
+    // Lists read as UI text by default; Georgia is a display face for the brand
+    // and the section labels, not the baseline for every sidebar row.
+    expect(CSS).toContain("--maid-display-font: Georgia, 'Times New Roman', 'PingFang SC'")
+    expect(CSS).toContain('--maid-workspace-font: var(--maid-ui-font)')
     for (const surface of [
-      /\[class\*='sectionHeader'\]\s*\{[^}]*font-family: var\(--maid-workspace-font\)/s,
+      /\[class\*='sectionHeader'\]\s*\{[^}]*font-family: var\(--maid-display-font\)/s,
       /\[class\*='searchInput'\]\s*\{[^}]*font-family: var\(--maid-workspace-font\)/s,
       /\[data-maid-workspace-row\]\s*\{[^}]*font-family: var\(--maid-workspace-font\)/s,
       /\[data-maid-session-row\]\s*\{[^}]*font-family: var\(--maid-workspace-font\)/s,
@@ -2300,10 +2300,13 @@ describe('Maid Atelier skin apply', () => {
       expect(CSS).toMatch(surface)
     }
     expect(CSS).toMatch(
-      /html\[data-dsh-whale-maid-workspace-font='system'\][\s\S]*?--maid-workspace-font: var\(--dsw-font-family, system-ui, sans-serif\)/,
+      /html\[data-dsh-whale-maid-workspace-font='system'\][\s\S]*?--maid-workspace-font: var\(--maid-ui-font\)/,
     )
     expect(CSS).toMatch(
-      /html\[data-dsh-whale-maid-workspace-font='conversation'\]\[data-dsh-whale-maid-font='system'\][\s\S]*?--maid-workspace-font: var\(--dsw-font-family, system-ui, sans-serif\)/,
+      /html\[data-dsh-whale-maid-workspace-font='conversation'\]\[data-dsh-whale-maid-font='system'\][\s\S]*?--maid-workspace-font: var\(--maid-ui-font\)/,
+    )
+    expect(CSS).toMatch(
+      /html\[data-dsh-whale-maid-workspace-font='serif'\][\s\S]*?--maid-workspace-font: var\(--maid-display-font\)/,
     )
   })
 
@@ -2725,26 +2728,34 @@ describe('Maid Atelier skin apply', () => {
     expect(CSS).toContain('--maid-workspace-ribbon-art')
     expect(shieldRule).toContain('background: var(--maid-workspace-crest-art)')
     expect(shieldRule).not.toContain('clip-path')
+    // The expanded workspace frosts its own list backdrop so session titles stay
+    // crisp over the lace texture.
+    expect(CSS).toMatch(
+      /\[data-slot='sidebar\.workspaces'\]:has\(\[data-maid-workspace-row\]\[aria-expanded='true'\]\)\s*\{[^}]*backdrop-filter: blur\(10px\)/s,
+    )
+    // No CJK glyph in this stylesheet may fall back to a Song face.
+    expect(CSS).not.toMatch(/Songti|STSong|SimSun|Noto Serif/)
     // The group row is a title bar the height of the title's line box; `auto`
     // keeps a host that still renders the session-count subtitle unclipped, and
     // the skin manager's range control feeds the custom property.
     expect(workspaceRowRule).toContain('height: auto')
-    expect(workspaceRowRule).toContain('min-height: var(--maid-workspace-row-height, 54px)')
+    expect(workspaceRowRule).toContain('min-height: var(--maid-workspace-row-height, 48px)')
     expect(workspaceRowRule).toContain('padding: clamp(1px,')
-    expect(shieldRule).toContain('height: min(calc(var(--maid-workspace-row-height, 54px) - 2px), 34px)')
+    expect(shieldRule).toContain('height: min(calc(var(--maid-workspace-row-height, 48px) - 2px), 34px)')
     expect(CSS).toMatch(/\[data-maid-workspace-active\] > \[class\*='folder'\]\s*\{/)
     expect(ribbonShapeRule).toContain('border-image-source: var(--maid-workspace-ribbon-art)')
     expect(ribbonShapeRule).toContain('border-image-slice: 0 145 0 140 fill')
     // The band, its overhang, the side slices and the shadow all derive from the
     // row height, so the roll keeps the artwork's proportions at every height.
-    expect(ribbonShapeRule).toContain('--maid-workspace-ribbon-box: calc(var(--maid-workspace-row-height, 54px) * 10 / 9)')
+    expect(ribbonShapeRule).toContain('--maid-workspace-ribbon-box: calc(var(--maid-workspace-row-height, 48px) * 0.62)')
     expect(ribbonShapeRule).toContain('border-image-width: 0 calc(var(--maid-workspace-ribbon-box) * 0.6) 0 calc(var(--maid-workspace-ribbon-box) * 7 / 12)')
-    expect(ribbonShapeRule).toContain('inset: calc(-1 * var(--maid-workspace-ribbon-overhang)) 0 calc(-1 * var(--maid-workspace-ribbon-overhang)) -12px')
+    expect(ribbonShapeRule).toContain('inset: var(--maid-workspace-ribbon-inset-y) 0 var(--maid-workspace-ribbon-inset-y) -6px')
     expect(ribbonShapeRule).toContain('border-image-repeat: stretch')
-    // One continuous reveal plus a separate settle: per-stop easing used to
-    // stall the reveal at 70% before the swallowtail.
-    expect(ribbonShapeRule).toContain('maidAtelierWorkspaceRibbonEnter 440ms cubic-bezier(0.22, 0.78, 0.2, 1) both')
-    expect(ribbonShapeRule).toContain('maidAtelierWorkspaceRibbonSettle 440ms')
+    // A single short reveal: the list is clicked often, and the old settle
+    // overshoot read as jitter.
+    expect(ribbonShapeRule).toContain('maidAtelierWorkspaceRibbonEnter 180ms cubic-bezier(0.22, 0.78, 0.2, 1) both')
+    expect(ribbonShapeRule).not.toContain('maidAtelierWorkspaceRibbonSettle')
+    expect(CSS).not.toContain('@keyframes maidAtelierWorkspaceRibbonSettle')
     expect(ribbonShapeRule).not.toContain('background-size')
     expect(ribbonShapeRule).not.toContain('clip-path')
     expect(CSS).toContain('@keyframes maidAtelierWorkspaceRibbonEnter')
@@ -2753,6 +2764,7 @@ describe('Maid Atelier skin apply', () => {
     expect(CSS).toMatch(/@keyframes maidAtelierWorkspaceRibbonEnter \{\s*from \{[^}]*\}\s*to \{[^}]*\}\s*\}/)
     expect(CSS).toContain('@keyframes maidAtelierWorkspaceRibbonContentEnter')
     expect(sessionRowRule).toContain('box-sizing: border-box')
+    expect(sessionRowRule).toContain('font-size: 13px')
     expect(sessionRowRule).toContain('width: 100%')
     expect(sessionRowRule).toContain('min-width: 0')
     expect(selectedSessionRule).toContain('background: transparent')

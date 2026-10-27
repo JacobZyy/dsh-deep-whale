@@ -19,9 +19,10 @@ describe('skin-manager stylesheet contract', () => {
 
   it('keeps the #22 serif choice opt-in', () => {
     expect(css).toContain("data-dsh-whale-maid-font='serif'")
-    expect(css).toContain("Georgia, 'Times New Roman', 'Songti SC'")
-    expect(css.indexOf("'Noto Serif SC'")).toBeLessThan(css.indexOf("'Noto Serif CJK SC'"))
-    expect(css.indexOf("'Noto Serif SC'")).toBeLessThan(css.indexOf('SimSun'))
+    // Latin keeps Georgia; CJK falls to a UI face rather than a Song serif, whose
+    // thin strokes disappear at label sizes on the navy ground.
+    expect(css).toContain("Georgia, 'Times New Roman', 'PingFang SC'")
+    expect(css).not.toMatch(/Songti|SimSun|STSong|Noto Serif/)
   })
 
   it('covers the full #22 prose element list', () => {

@@ -14,7 +14,16 @@ body[data-dsh-maid-atelier] {
   --maid-gold: #c5a468;
   --maid-gold-soft: #e2cfaa;
   --maid-ink: #172347;
-  --maid-workspace-font: Georgia, 'Times New Roman', serif;
+  /* Display face: Georgia keeps the Latin serif, but CJK falls to the
+     UI face instead of a Song serif — those strokes vanish at label sizes. */
+  --maid-display-font: Georgia, 'Times New Roman', 'PingFang SC',
+    'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', system-ui, sans-serif;
+  /* Lists read as UI text: CJK-first so 12–15px labels keep their strokes
+     on the navy ground, Latin rides the same metrics instead of Georgia's. */
+  --maid-ui-font: -apple-system, BlinkMacSystemFont, 'PingFang SC',
+    'Hiragino Sans GB', 'Noto Sans SC', 'Source Han Sans SC', 'Microsoft YaHei',
+    system-ui, sans-serif;
+  --maid-workspace-font: var(--maid-ui-font);
   --maid-glass: rgba(248, 250, 255, 0.68);
   /* The frosted sheet every non-conversation `main` page reads on. Opaque
      enough to hold small type (a 40%-opacity disabled label still clears
@@ -987,7 +996,7 @@ body[data-dsh-maid-atelier] button[class*='newSession'] {
   border-image-repeat: stretch;
   border-radius: 0;
   background: none;
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: var(--maid-display-font);
   font-size: 16px;
   font-weight: 600;
   letter-spacing: 0.01em;
@@ -1222,7 +1231,7 @@ body[data-dsh-maid-atelier]
   border-image-repeat: stretch;
   border-radius: 0;
   background: none;
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: var(--maid-display-font);
   letter-spacing: 0.02em;
   box-shadow: none;
   filter: drop-shadow(0 4px 10px rgba(2, 8, 28, 0.26));
@@ -1891,14 +1900,14 @@ body[data-dsh-maid-atelier][data-ds-dark-theme] [data-dsh-better-sidebar] {
 
 body[data-dsh-maid-atelier] [data-slot='sidebar'] :not(:where(dialog *, [role='dialog'] *, [role='alertdialog'] *, [role='menu'] *, [data-menu-material] *))[class*='sectionHeader'] {
   color: #d9bd83;
-  font-family: var(--maid-workspace-font);
-  letter-spacing: 0.025em;
+  font-family: var(--maid-display-font);
+  letter-spacing: 0.06em;
   text-shadow: 0 1px 2px rgba(2, 7, 24, 0.62);
 }
 
 body[data-dsh-maid-atelier] [data-slot='sidebar'] :not(:where(dialog *, [role='dialog'] *, [role='alertdialog'] *, [role='menu'] *, [data-menu-material] *))[class*='sectionHeader'] [class*='sectionLabel'] {
   color: #d9bd83;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 500;
 }
 
@@ -2754,6 +2763,49 @@ body[data-dsh-maid-atelier][data-maid-sidebar-size='rail']
   }
 }
 
+
+/* Nav rows are the host's `panelRow` buttons (aria-current marks the open
+   panel). They now speak the same selection language as workspaces and
+   sessions: a 2px gold rule, a low-saturation fill, and UI typography. */
+body[data-dsh-maid-atelier] [data-slot='sidebar'] button[class*='panelRow'] {
+  border-radius: 7px;
+  color: #e7ecf7;
+  font-family: var(--maid-ui-font);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0;
+  transition: background 140ms ease, box-shadow 140ms ease, color 140ms ease;
+}
+
+body[data-dsh-maid-atelier] [data-slot='sidebar'] button[class*='panelRow']:hover:not([aria-current='page']) {
+  background: linear-gradient(100deg, rgba(120, 150, 220, 0.12), rgba(25, 46, 95, 0.06));
+}
+
+body[data-dsh-maid-atelier] [data-slot='sidebar'] button[class*='panelRow'][aria-current='page'] {
+  background: linear-gradient(100deg, rgba(120, 150, 220, 0.22), rgba(25, 46, 95, 0.1));
+  color: #fff8e8;
+  box-shadow:
+    inset 2px 0 rgba(226, 189, 110, 0.92),
+    inset 0 1px rgba(225, 207, 170, 0.16),
+    inset 0 -1px rgba(225, 207, 170, 0.1);
+}
+
+body[data-dsh-maid-atelier] [data-slot='sidebar'] button[class*='panelRow']:focus-visible {
+  outline: 1px solid rgba(226, 189, 110, 0.8);
+  outline-offset: -1px;
+}
+
+/* Expanded workspace: frost the list's own backdrop so a long run of session
+   titles stays crisp instead of competing with the lace texture behind it. */
+body[data-dsh-maid-atelier]
+  [data-slot='sidebar.workspaces']:has([data-maid-workspace-row][aria-expanded='true']) {
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(6, 15, 38, 0.55), rgba(6, 15, 38, 0.38));
+  box-shadow: inset 0 0 0 1px rgba(226, 189, 110, 0.14);
+  backdrop-filter: blur(10px) saturate(1.06);
+  -webkit-backdrop-filter: blur(10px) saturate(1.06);
+}
+
 /* Workspace groups receive skin-owned semantic hooks from the client entry.
    This keeps the ornamental tree independent from generated CSS-module names
    while leaving the official rows and their interactions intact. */
@@ -2771,8 +2823,8 @@ body[data-dsh-maid-atelier] [data-maid-workspace-row] {
   isolation: isolate;
   position: relative;
   height: auto;
-  min-height: var(--maid-workspace-row-height, 54px);
-  padding: clamp(1px, calc((var(--maid-workspace-row-height, 54px) - 22px) * 0.1875 + 1px), 7px) 10px clamp(1px, calc((var(--maid-workspace-row-height, 54px) - 22px) * 0.1875 + 1px), 7px);
+  min-height: var(--maid-workspace-row-height, 48px);
+  padding: clamp(1px, calc((var(--maid-workspace-row-height, 48px) - 22px) * 0.1875 + 1px), 7px) 10px clamp(1px, calc((var(--maid-workspace-row-height, 48px) - 22px) * 0.1875 + 1px), 7px);
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -2792,9 +2844,9 @@ body[data-dsh-maid-atelier] [data-maid-workspace-row] > * {
 
 body[data-dsh-maid-atelier] [data-maid-workspace-row] > [class*='folder'] {
   display: inline-flex;
-  width: min(calc(var(--maid-workspace-row-height, 54px) - 2px), 28px);
-  height: min(calc(var(--maid-workspace-row-height, 54px) - 2px), 34px);
-  margin: min(4px, calc((var(--maid-workspace-row-height, 54px) - 22px) / 8)) 0 0 -7px;
+  width: min(calc(var(--maid-workspace-row-height, 48px) - 2px), 28px);
+  height: min(calc(var(--maid-workspace-row-height, 48px) - 2px), 34px);
+  margin: min(4px, calc((var(--maid-workspace-row-height, 48px) - 22px) / 8)) 0 0 -7px;
   background: var(--maid-workspace-crest-art) center / contain no-repeat;
   color: transparent;
   filter: drop-shadow(0 2px 3px rgba(2, 8, 28, 0.48));
@@ -2813,14 +2865,19 @@ body[data-dsh-maid-atelier] [data-maid-workspace-row]:hover > [class*='chevron']
 }
 
 body[data-dsh-maid-atelier] [data-maid-workspace-row] [class*='title'] {
-  font-size: 15px;
+  font-family: var(--maid-workspace-font);
+  font-size: 15.5px;
   font-weight: 500;
-  line-height: 20px;
+  line-height: 22px;
+  letter-spacing: 0;
+  -webkit-font-smoothing: antialiased;
 }
 
 body[data-dsh-maid-atelier] [data-maid-workspace-row] [class*='meta'] {
   color: #d9bd83;
-  font-size: 12px;
+  font-family: var(--maid-ui-font);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
 }
 
 body[data-dsh-maid-atelier] [data-maid-workspace-row][aria-expanded='true']:not([data-maid-workspace-active]) {
@@ -2845,8 +2902,8 @@ body[data-dsh-maid-atelier] [data-maid-workspace-active] {
 }
 
 body[data-dsh-maid-atelier] [data-maid-workspace-active] > [class*='folder'] {
-  width: min(calc(var(--maid-workspace-row-height, 54px) - 2px), 30px);
-  height: min(calc(var(--maid-workspace-row-height, 54px) - 2px), 38px);
+  width: min(calc(var(--maid-workspace-row-height, 48px) - 2px), 30px);
+  height: min(calc(var(--maid-workspace-row-height, 48px) - 2px), 38px);
   margin-block-start: 0;
 }
 
@@ -2858,14 +2915,17 @@ body[data-dsh-maid-atelier] [data-maid-workspace-active]:hover {
   background: transparent;
 }
 
-/* Scale the rolled edges with the banner; preserve the original 54px geometry. */
+/* The ribbon stays as the skin's signature, but as a small flag inside the row:
+   no overhang into its neighbours, no bounce. A shorter shape leaves the label
+   on navy instead of on the banner fill, and one 180ms reveal replaces the old
+   two-animation entrance whose overshoot read as jitter in a list. */
 body[data-dsh-maid-atelier] [data-maid-workspace-active]::before {
-  --maid-workspace-ribbon-box: calc(var(--maid-workspace-row-height, 54px) * 10 / 9);
-  --maid-workspace-ribbon-overhang: calc((var(--maid-workspace-ribbon-box) - var(--maid-workspace-row-height, 54px)) / 2);
+  --maid-workspace-ribbon-box: calc(var(--maid-workspace-row-height, 48px) * 0.62);
+  --maid-workspace-ribbon-inset-y: calc((var(--maid-workspace-row-height, 48px) - var(--maid-workspace-ribbon-box)) / 2);
   content: '';
   position: absolute;
   box-sizing: border-box;
-  inset: calc(-1 * var(--maid-workspace-ribbon-overhang)) 0 calc(-1 * var(--maid-workspace-ribbon-overhang)) -12px;
+  inset: var(--maid-workspace-ribbon-inset-y) 0 var(--maid-workspace-ribbon-inset-y) -6px;
   z-index: 0;
   border-style: solid;
   border-width: 0 calc(var(--maid-workspace-ribbon-box) * 0.6) 0 calc(var(--maid-workspace-ribbon-box) * 7 / 12);
@@ -2873,15 +2933,8 @@ body[data-dsh-maid-atelier] [data-maid-workspace-active]::before {
   border-image-slice: 0 145 0 140 fill;
   border-image-width: 0 calc(var(--maid-workspace-ribbon-box) * 0.6) 0 calc(var(--maid-workspace-ribbon-box) * 7 / 12);
   border-image-repeat: stretch;
-  filter: drop-shadow(0 calc(var(--maid-workspace-ribbon-box) / 12) calc(var(--maid-workspace-ribbon-box) * 2 / 15) rgba(2, 8, 28, 0.4));
-  /* Two single-segment animations: the reveal runs one continuous
-     deceleration from the rolled edge through the swallowtail, and the slide
-     settles with its own slight overshoot. The former multi-stop keyframes
-     re-applied the easing per stop, so the reveal stalled at 70% and then
-     re-accelerated over the tail. */
-  animation:
-    maidAtelierWorkspaceRibbonEnter 440ms cubic-bezier(0.22, 0.78, 0.2, 1) both,
-    maidAtelierWorkspaceRibbonSettle 440ms cubic-bezier(0.3, 1.25, 0.6, 1) both;
+  filter: drop-shadow(0 calc(var(--maid-workspace-ribbon-box) / 14) calc(var(--maid-workspace-ribbon-box) * 2 / 15) rgba(2, 8, 28, 0.4));
+  animation: maidAtelierWorkspaceRibbonEnter 180ms cubic-bezier(0.22, 0.78, 0.2, 1) both;
   pointer-events: none;
 }
 
@@ -2891,7 +2944,7 @@ body[data-dsh-maid-atelier] [data-maid-workspace-active]::before {
    keep `both`. */
 body[data-dsh-maid-atelier] [data-maid-workspace-active] > [class*='folder'],
 body[data-dsh-maid-atelier] [data-maid-workspace-active] [class*='projectText'] {
-  animation: maidAtelierWorkspaceRibbonContentEnter 260ms 90ms cubic-bezier(0.2, 0.74, 0.22, 1) backwards;
+  animation: maidAtelierWorkspaceRibbonContentEnter 160ms 40ms cubic-bezier(0.2, 0.74, 0.22, 1) backwards;
 }
 
 @keyframes maidAtelierWorkspaceRibbonEnter {
@@ -2903,16 +2956,6 @@ body[data-dsh-maid-atelier] [data-maid-workspace-active] [class*='projectText'] 
   to {
     opacity: 1;
     clip-path: inset(0);
-  }
-}
-
-@keyframes maidAtelierWorkspaceRibbonSettle {
-  from {
-    transform: translateX(-8px);
-  }
-
-  to {
-    transform: translateX(0);
   }
 }
 
@@ -2936,10 +2979,14 @@ body[data-dsh-maid-atelier] [data-maid-session-row] {
   height: 32px;
   padding: 0 8px 0 24px;
   border: 0;
-  border-radius: 0;
+  border-radius: 6px;
   background: transparent;
-  color: #d7c8a8;
+  color: #ddd0b3;
   font-family: var(--maid-workspace-font);
+  font-size: 13px;
+  line-height: 18px;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
   box-shadow: none;
 }
 
@@ -3161,7 +3208,7 @@ body[data-dsh-maid-atelier] [data-phase='hero'] {
 /* Empty-state headline and workspace chip establish the atelier identity. */
 body[data-dsh-maid-atelier] [class*='headline'] {
   color: var(--maid-ink);
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: var(--maid-display-font);
   font-weight: 600;
   letter-spacing: 0.01em;
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8), 0 5px 18px rgba(32, 49, 96, 0.16);
@@ -4094,7 +4141,7 @@ body[data-dsh-maid-atelier] [data-composer-card] [class*='trailing']
   padding: 0 5px 0 8px;
   border-radius: 10px;
   color: #314979;
-  font-family: Georgia, 'Times New Roman', var(--dsw-font-family);
+  font-family: var(--maid-ui-font);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.01em;
@@ -6307,7 +6354,12 @@ html[data-dsh-whale-maid-workspace-font='system']
   body[data-dsh-maid-atelier],
 html[data-dsh-whale-maid-workspace-font='conversation'][data-dsh-whale-maid-font='system']
   body[data-dsh-maid-atelier] {
-  --maid-workspace-font: var(--dsw-font-family, system-ui, sans-serif);
+  --maid-workspace-font: var(--maid-ui-font);
+}
+
+/* Georgia is an option now, not the baseline. */
+html[data-dsh-whale-maid-workspace-font='serif'] body[data-dsh-maid-atelier] {
+  --maid-workspace-font: var(--maid-display-font);
 }
 
 /* Optional conversation typography from #22. Code keeps its existing
@@ -6315,8 +6367,8 @@ html[data-dsh-whale-maid-workspace-font='conversation'][data-dsh-whale-maid-font
 html[data-dsh-whale-maid-font='serif']
   body[data-dsh-maid-atelier]
   :is([data-chat-flow], [class*='userRow'] [class*='bubble']:not([role='tooltip'])) {
-  --dsw-font-family: Georgia, 'Times New Roman', 'Songti SC',
-    'Noto Serif SC', 'Noto Serif CJK SC', STSong, SimSun, serif;
+  --dsw-font-family: Georgia, 'Times New Roman', 'PingFang SC',
+    'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', system-ui, sans-serif;
   font-family: var(--dsw-font-family);
 }
 
@@ -6338,8 +6390,8 @@ html[data-dsh-whale-maid-font='serif']
     button,
     [class*='triggerLabel']
   ) {
-  font-family: Georgia, 'Times New Roman', 'Songti SC',
-    'Noto Serif SC', 'Noto Serif CJK SC', STSong, SimSun, serif;
+  font-family: Georgia, 'Times New Roman', 'PingFang SC',
+    'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', system-ui, sans-serif;
 }
 
 html[data-dsh-whale-maid-font='serif']
@@ -6568,7 +6620,7 @@ body[data-dsh-maid-atelier]
   box-shadow: none;
   backdrop-filter: none;
   color: var(--dsw-alias-label-caption);
-  font-family: Georgia, 'Times New Roman', var(--dsw-font-family);
+  font-family: var(--maid-ui-font);
   font-size: 13px;
   letter-spacing: 0.02em;
   cursor: text;
